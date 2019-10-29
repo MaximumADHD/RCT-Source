@@ -58,24 +58,21 @@
     <StartupObject />
   </PropertyGroup>
   <PropertyGroup>
-    <Win32Resource>C:\Users\gartung\Downloads\Tracker2\Tracker\src\Icons.res</Win32Resource>
+    <Win32Resource>Icons.res</Win32Resource>
   </PropertyGroup>
   <ItemGroup>
-    <Reference Include="LZ4, Version=1.0.15.93, Culture=neutral, PublicKeyToken=62e1b5ec1eec9bdd, processorArchitecture=MSIL">
-      <SpecificVersion>False</SpecificVersion>
-      <HintPath>Packages\LZ4.dll</HintPath>
+    <Reference Include="LZ4">
+      <HintPath>Include\LZ4.dll</HintPath>
     </Reference>
     <Reference Include="Newtonsoft.Json, Version=12.0.0.0, Culture=neutral, PublicKeyToken=30ad4fe6b2a6aeed, processorArchitecture=MSIL">
       <HintPath>..\packages\Newtonsoft.Json.12.0.2\lib\net45\Newtonsoft.Json.dll</HintPath>
       <Private>True</Private>
     </Reference>
-    <Reference Include="RobloxAPIDumpTool, Version=2.0.1.0, Culture=neutral, processorArchitecture=MSIL">
-      <SpecificVersion>False</SpecificVersion>
-      <HintPath>Packages\RobloxAPIDumpTool.dll</HintPath>
+    <Reference Include="RobloxAPIDumpTool">
+      <HintPath>Include\RobloxAPIDumpTool.dll</HintPath>
     </Reference>
-    <Reference Include="RobloxFileFormat, Version=1.0.0.0, Culture=neutral, processorArchitecture=MSIL">
-      <SpecificVersion>False</SpecificVersion>
-      <HintPath>Packages\RobloxFileFormat.dll</HintPath>
+    <Reference Include="RobloxFileFormat">
+      <HintPath>Include\RobloxFileFormat.dll</HintPath>
     </Reference>
     <Reference Include="System" />
     <Reference Include="System.Core" />
@@ -91,13 +88,13 @@
     <Reference Include="System.Xml" />
   </ItemGroup>
   <ItemGroup>
-    <Compile Include="History\ClientVersionInfo.cs" />
-    <Compile Include="History\DeployLog.cs" />
-    <Compile Include="History\HistoryCache.cs" />
-    <Compile Include="History\StudioDeployLogs.cs" />
-    <Compile Include="Installer\RobloxFileManifest.cs" />
-    <Compile Include="Installer\RobloxPackageManifest.cs" />
-    <Compile Include="Installer\RobloxStudioInstaller.cs" />
+    <Compile Include="Bootstrapper\FileManifest.cs" />
+    <Compile Include="Bootstrapper\PackageManifest.cs" />
+    <Compile Include="Bootstrapper\History\ClientVersionInfo.cs" />
+    <Compile Include="Bootstrapper\History\DeployLog.cs" />
+    <Compile Include="Bootstrapper\History\HistoryCache.cs" />
+    <Compile Include="Bootstrapper\History\StudioDeployLogs.cs" />
+    <Compile Include="Bootstrapper\StudioBootstrapper.cs" />
     <Compile Include="Properties\Settings.Designer.cs">
       <AutoGen>True</AutoGen>
       <DesignTimeSharedInput>True</DesignTimeSharedInput>

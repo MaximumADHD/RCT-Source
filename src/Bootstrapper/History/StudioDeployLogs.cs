@@ -8,25 +8,26 @@ namespace RobloxClientTracker
     public class StudioDeployLogs
     {
         private const string LogPattern = "New (Studio6?4?) (version-[a-f\\d]+) at \\d+/\\d+/\\d+ \\d+:\\d+:\\d+ [A,P]M, file version: (\\d+), (\\d+), (\\d+), (\\d+)...Done!";
+
         public string Branch { get; private set; }
 
-        private static Dictionary<string, StudioDeployLogs> LogCache = new Dictionary<string, StudioDeployLogs>();
         private string LastDeployHistory = "";
+        private static Dictionary<string, StudioDeployLogs> LogCache = new Dictionary<string, StudioDeployLogs>();
 
-        public List<DeployLog> CurrentLogs;
+        public HashSet<DeployLog> CurrentLogs_x86 = new HashSet<DeployLog>();
+        public HashSet<DeployLog> CurrentLogs_x64 = new HashSet<DeployLog>();
 
         private StudioDeployLogs(string branch)
         {
             Branch = branch;
             LogCache[branch] = this;
-
-            CurrentLogs = new List<DeployLog>();
         }
 
-        private void UpdateLogs(string deployHistory, bool is64Bit = false)
+        private void UpdateLogs(string deployHistory)
         {
             MatchCollection matches = Regex.Matches(deployHistory, LogPattern);
-            CurrentLogs.Clear();
+            CurrentLogs_x86.Clear();
+            CurrentLogs_x64.Clear();
 
             foreach (Match match in matches)
             {
@@ -46,11 +47,18 @@ namespace RobloxClientTracker
                 int.TryParse(data[5], out deployLog.Patch);
                 int.TryParse(data[6], out deployLog.Changelist);
 
-                CurrentLogs.Add(deployLog);
+                HashSet<DeployLog> targetList;
+
+                if (deployLog.Is64Bit)
+                    targetList = CurrentLogs_x64;
+                else
+                    targetList = CurrentLogs_x86;
+
+                targetList.Add(deployLog);
             }
         }
 
-        public static async Task<StudioDeployLogs> Get(string branch, bool is64Bit = false)
+        public static async Task<StudioDeployLogs> Get(string branch)
         {
             StudioDeployLogs logs = null;
 

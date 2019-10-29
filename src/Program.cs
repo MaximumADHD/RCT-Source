@@ -85,7 +85,7 @@ namespace RobloxClientTracker
         static string stageDir;
 
         static string studioPath;
-        static RobloxStudioInstaller studio;
+        static StudioBootstrapper studio;
 
         public static Encoding UTF8 = new UTF8Encoding(false);
         public static string Trunk => trunk;
@@ -155,28 +155,29 @@ namespace RobloxClientTracker
 
             List<string> outLines = new List<string>();
 
-            var listener = new DataReceivedEventHandler((sender, e) =>
+            var processOutput = new Action<string, bool>((message, isError) =>
             {
-                string stdout = e.Data;
-
-                if (stdout != null && stdout.Length > 0)
+                if (message != null && message.Length > 0)
                 {
                     lock (outLines)
                     {
-                        if (VERBOSE_GIT_LOGS)
+                        if (VERBOSE_GIT_LOGS || isError)
                         {
                             log("[git] ", MAGENTA);
-                            print(stdout, WHITE);
+                            print(message, isError ? RED : WHITE);
                         }
 
-                        outLines.Add(stdout);
+                        outLines.Add(message);
                     }
                 }
             });
 
-            git.OutputDataReceived += listener;
-            git.ErrorDataReceived += listener;
+            git.ErrorDataReceived += new DataReceivedEventHandler
+                ((sender, evt) => processOutput(evt.Data, true));
 
+            git.OutputDataReceived += new DataReceivedEventHandler
+                ((sender, evt) => processOutput(evt.Data, false));
+            
             git.BeginOutputReadLine();
             git.BeginErrorReadLine();
 
@@ -295,8 +296,6 @@ namespace RobloxClientTracker
 
                 File.WriteAllBytes(filePath, luaFile);
             }
-
-            Debugger.Break();
         }
 
         static void extractQtResources()
@@ -834,7 +833,7 @@ namespace RobloxClientTracker
         {
             // Make sure Roblox Studio is up to date for this build.
             print("Syncing Roblox Studio...", ConsoleColor.Green);
-            await studio.RunInstaller();
+            await studio.UpdateStudio();
 
             // Copy some metadata generated during the studio installation.
             string studioDir = studio.GetStudioDirectory();
@@ -923,13 +922,9 @@ namespace RobloxClientTracker
             await Task.WhenAll(taskPool);
 
             foreach (Task task in taskPool)
-            {
                 if (task.Status == TaskStatus.Faulted)
-                {
                     throw task.Exception;
-                }
-            }
-
+            
             taskPool.Clear();
 
             // Unpack and transfer specific content data from the studio build.
@@ -1011,11 +1006,15 @@ namespace RobloxClientTracker
 
                 if (!File.Exists(privateKey))
                 {
-                    print("FATAL: Missing SSH key 'RobloxClientTracker' in ~\\.ssh!", RED);
+                    print("FATAL: Missing SSH private key 'RobloxClientTracker' in ~\\.ssh!", RED);
                     print("Please generate such a key above and make sure its connected to GitHub!\n", RED);
-                    print("Press any key to continue...");
 
+                    print("For more information, visit:");
+                    print("https://help.github.com/en/github/authenticating-to-github/generating-a-new-ssh-key-and-adding-it-to-the-ssh-agent\n", CYAN);
+
+                    print("Press any key to continue...");
                     Console.Read();
+
                     Environment.Exit(1);
                 }
 
@@ -1085,7 +1084,7 @@ namespace RobloxClientTracker
                     }
 
                     // Check for updates to the version
-                    var info = await RobloxStudioInstaller.GetCurrentVersionInfo(branch);
+                    var info = await StudioBootstrapper.GetCurrentVersionInfo(branch);
 
                     if (FORCE_UPDATE || info.Guid != currentVersion)
                     {
@@ -1213,14 +1212,14 @@ namespace RobloxClientTracker
 
             #endregion
 
+            RootRegistry = Registry.CurrentUser.Open("Software", "RobloxClientTracker");
+            BranchRegistry = RootRegistry.Open(branch);
+
             branch = branch.ToLower();
             trunk = createDirectory(@"C:\Roblox-Client-Tracker");
             stageDir = createDirectory(trunk, "stage", branch);
 
-            RootRegistry = Registry.CurrentUser.Open("Software", "RobloxClientTracker");
-            BranchRegistry = RootRegistry.Open(branch);
-
-            studio = new RobloxStudioInstaller(branch);
+            studio = new StudioBootstrapper(branch);
             studioPath = studio.GetStudioPath();
 
             Task mainThread = Task.Run(() => MainAsync());
