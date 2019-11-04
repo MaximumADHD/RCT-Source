@@ -199,12 +199,15 @@ namespace RobloxClientTracker
 
             foreach (string line in query)
             {
-                string[] data = line.Split('\t');
+                if (line.Contains('\t'))
+                {
+                    string[] data = line.Split('\t');
 
-                string flag = data[0];
-                string name = data[1];
-                
-                result.Add(name);
+                    string flag = data[0];
+                    string name = data[1];
+
+                    result.Add(name);
+                }
             }
 
             return result;
@@ -248,10 +251,6 @@ namespace RobloxClientTracker
         {
             string dest = resetDirectory(target);
             DirectoryInfo src = new DirectoryInfo(source);
-
-            // HACK
-            if (src.Name == "Packages")
-                return;
 
             foreach (var file in src.GetFiles())
             {
@@ -982,7 +981,62 @@ namespace RobloxClientTracker
             }
 
             await Task.WhenAll(taskPool);
-            print("Preparing commit...", CYAN);
+        }
+
+        static bool pushCommit(string label, string filter = ".")
+        {
+            print($"\t[{label}] Checking in files...", YELLOW);
+            git($"add {filter}");
+
+            // Verify this update is worth committing.
+            var files = getChangedFiles(branch);
+
+            int updateCount = 0;
+            int boringCount = 0;
+
+            foreach (string file in files)
+            {
+                try
+                {
+                    string filePath = stageDir + '\\' + file;
+                    FileInfo fileInfo = new FileInfo(filePath);
+
+                    if (boringFiles.Contains(fileInfo.Name) || fileInfo.Extension.Contains("rbx"))
+                    {
+                        boringCount++;
+                        continue;
+                    }
+
+                    updateCount++;
+                }
+                catch
+                {
+                    // Illegal characters? No clue what to make of this.
+                }
+            }
+
+            if (updateCount > 0 || FORCE_COMMIT)
+            {
+                print($"[{label}]\tCommitting...", CYAN);
+                git($"commit -m \"{label}\"");
+
+                print($"[{label}]\tPushing commit...", CYAN);
+                git($"push");
+
+                return true;
+            }
+            else
+            {
+                string skipMsg;
+
+                if (boringCount > 0)
+                    skipMsg = "This update was deemed to be boring";
+                else
+                    skipMsg = "No changes were detected";
+
+                print($"\t[{label}] {skipMsg}, skipping commit!", RED);
+                return false;
+            }
         }
 
         static async Task MainAsync()
@@ -1091,58 +1145,19 @@ namespace RobloxClientTracker
                         print("Update detected!", YELLOW);
                         await updateStage(info);
 
-                        // Check in the files.
-                        print("\tChecking in files...", YELLOW);
-                        git("add .");
+                        // Create two commits:
+                        // - One for package files.
+                        // - One for everything else.
 
-                        // Verify this update is worth committing.
-                        var files = getChangedFiles(branch);
-                        int updateCount = 0;
-                        int boringCount = 0;
+                        string versionId = info.Version;
+                        print("Creating commits...", YELLOW);
 
-                        foreach (string file in files)
-                        {
-                            try
-                            {
-                                string filePath = stageDir + '\\' + file;
-                                FileInfo fileInfo = new FileInfo(filePath);
+                        bool didSubmitPackages = pushCommit($"{versionId} (Packages)", "*/Packages/*");
+                        bool didSubmitCore = pushCommit(versionId);
 
-                                if (boringFiles.Contains(fileInfo.Name) || fileInfo.Extension.Contains("rbx"))
-                                {
-                                    boringCount++;
-                                    continue;
-                                }
-
-                                updateCount++;
-                            }
-                            catch
-                            {
-                                // Illegal characters? No clue what to make of this.
-                            }
-                        }
-
-                        if (updateCount > 0 || FORCE_COMMIT)
-                        {
-                            print("\tCommitting...", CYAN);
-                            git($"commit -m {info.Version}");
-
-                            print("\tPushing...", CYAN);
-                            git($"push");
-
-                            print("\tDone!", GREEN);
-                        }
-                        else
-                        {
-                            string skipMsg;
-
-                            if (boringCount > 0)
-                                skipMsg = "This update was deemed to be boring";
-                            else
-                                skipMsg = "No changes were detected";
-
-                            print($"\t{skipMsg}, skipping commit!", RED);
-                        }
-
+                        if (didSubmitPackages || didSubmitCore)
+                            print("Done!", GREEN);
+                        
                         currentVersion = info.Guid;
                         BranchRegistry.SetValue("Version", info.Guid);
                     }
