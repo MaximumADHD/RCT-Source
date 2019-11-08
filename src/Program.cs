@@ -131,9 +131,13 @@ namespace RobloxClientTracker
             return sanitized;
         }
 
-        public static void WriteFile(string path, string contents)
+        public static void WriteFile(string path, string contents, bool log = false)
         {
             string sanitized = sanitizeString(contents);
+
+            if (log)
+                print($"Writing file: {localPath(path)}", ConsoleColor.DarkYellow);
+
             File.WriteAllText(path, sanitized, UTF8);
         }
 
@@ -192,23 +196,13 @@ namespace RobloxClientTracker
             return query.First();
         }
 
-        static List<string> getChangedFiles(string branch)
+        static List<string> getChangedFiles(string branch, string filter)
         {
-            var query = git("diff", branch, "--name-status");
+            var query = git("diff", "--name-only", $"origin/{branch}", "--", filter);
             var result = new List<string>();
 
             foreach (string line in query)
-            {
-                if (line.Contains('\t'))
-                {
-                    string[] data = line.Split('\t');
-
-                    string flag = data[0];
-                    string name = data[1];
-
-                    result.Add(name);
-                }
-            }
+                result.Add(line);
 
             return result;
         }
@@ -716,7 +710,7 @@ namespace RobloxClientTracker
                 if (source.Length > 0)
                 {
                     string filePath = Path.Combine(directory, name + extension);
-                    WriteFile(filePath, source);
+                    WriteFile(filePath, source, true);
                 }
             }
             else if (at.IsA<LocalizationTable>())
@@ -727,7 +721,7 @@ namespace RobloxClientTracker
                 if (csv.Length > 0)
                 {
                     string filePath = Path.Combine(directory, name + ".csv");
-                    WriteFile(filePath, csv);
+                    WriteFile(filePath, csv, true);
                 }
             }
             else if (at.IsA<StringValue>() && name != "AvatarPartScaleType")
@@ -738,7 +732,7 @@ namespace RobloxClientTracker
                 if (value.Length > 0)
                 {
                     string filePath = Path.Combine(directory, name + ".txt");
-                    WriteFile(filePath, value);
+                    WriteFile(filePath, value, true);
                 }
             }
 
@@ -989,7 +983,7 @@ namespace RobloxClientTracker
             git($"add {filter}");
 
             // Verify this update is worth committing.
-            var files = getChangedFiles(branch);
+            var files = getChangedFiles(branch, filter);
 
             int updateCount = 0;
             int boringCount = 0;
