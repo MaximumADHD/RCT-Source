@@ -21,7 +21,7 @@ namespace RobloxClientTracker
             BranchCache.Add(branch, this);
         }
 
-        public static async Task<string> GetDeployHistory(string branch)
+        public static async Task<string> GetDeployHistory(string branch, bool refresh)
         {
             return await Task.Run(() =>
             {
@@ -36,7 +36,7 @@ namespace RobloxClientTracker
                 {
                     TimeSpan timeDiff = DateTime.Now - cache.LastUpdate;
 
-                    if (timeDiff.TotalMinutes > 5)
+                    if (timeDiff.TotalMinutes > 1 || refresh)
                     {
                         string historyEndpoint = $"https://s3.amazonaws.com/setup.{branch}.com/DeployHistory.txt";
 

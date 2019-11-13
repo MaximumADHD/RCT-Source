@@ -58,18 +58,19 @@ namespace RobloxClientTracker
             }
         }
 
-        public static async Task<StudioDeployLogs> Get(string branch)
+        public static async Task<StudioDeployLogs> Get(string branch, bool refresh = false)
         {
             StudioDeployLogs logs = null;
+            bool init = !LogCache.ContainsKey(branch);
 
-            if (LogCache.ContainsKey(branch))
-                logs = LogCache[branch];
-            else
+            if (init)
                 logs = new StudioDeployLogs(branch);
+            else
+                logs = LogCache[branch];
 
-            string deployHistory = await HistoryCache.GetDeployHistory(branch);
+            string deployHistory = await HistoryCache.GetDeployHistory(branch, init || refresh);
 
-            if (logs.LastDeployHistory != deployHistory)
+            if (init || refresh)
             {
                 logs.LastDeployHistory = deployHistory;
                 logs.UpdateLogs(deployHistory);

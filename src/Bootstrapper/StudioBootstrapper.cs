@@ -209,47 +209,21 @@ namespace RobloxClientTracker
             }
         }
 
-        public static async Task<ClientVersionInfo> GetCurrentVersionInfo(string branch, string fastVersionGuid = "")
+        public static async Task<ClientVersionInfo> GetCurrentVersionInfo(string branch, string fastGuid = "")
         {
             string binaryType = GetStudioBinaryType();
 
             if (branch == "roblox")
                 return await ClientVersionInfo.Get(binaryType);
 
-            if (fastVersionGuid != "")
-            {
-                string latestGuid;
-
-                if (binaryType == "WindowsStudio64")
-                    latestGuid = versionRegistry.GetString("LatestGuid_x64");
-                else
-                    latestGuid = versionRegistry.GetString("LatestGuid_x86");
-
-                // If we already determined the fast version guid is pointing
-                // to the other version of Roblox Studio, fallback to the
-                // version data that has been cached already.
-
-                if (fastVersionGuid == latestGuid)
-                {
-                    string versionId = versionRegistry.GetString("Version");
-                    string versionGuid = versionRegistry.GetString("VersionGuid");
-
-                    ClientVersionInfo proxy = new ClientVersionInfo()
-                    {
-                        Version = versionId,
-                        Guid = versionGuid
-                    };
-
-                    return proxy;
-                }
-            }
-
-            // Unfortunately the ClientVersionInfo end-point on gametest
-            // isn't available to the public, so I have to parse the
-            // DeployHistory.txt file on their setup s3 bucket.
+            if (fastGuid == "")
+                fastGuid = await GetFastVersionGuid(branch);
 
             var info = new ClientVersionInfo();
-            var logData = await StudioDeployLogs.Get(branch);
+            string latestFastGuid = versionRegistry.GetString("LatestFastGuid");
+
+            bool refresh = (latestFastGuid != fastGuid);
+            var logData = await StudioDeployLogs.Get(branch, refresh);
 
             DeployLog build_x86 = logData.CurrentLogs_x86.Last();
             DeployLog build_x64 = logData.CurrentLogs_x64.Last();
@@ -265,6 +239,7 @@ namespace RobloxClientTracker
                 info.Guid = build_x86.VersionGuid;
             }
 
+            versionRegistry.SetValue("LatestFastGuid", fastGuid);
             versionRegistry.SetValue("LatestGuid_x86", build_x86.VersionGuid);
             versionRegistry.SetValue("LatestGuid_x64", build_x64.VersionGuid);
 
@@ -506,7 +481,7 @@ namespace RobloxClientTracker
                 if (branch != "roblox")
                     echo("Possible update detected, verifying...");
 
-                versionInfo = await GetCurrentVersionInfo(branch, fastVersion);
+                versionInfo = await GetCurrentVersionInfo(branch);
                 buildVersion = versionInfo.Guid;
             }
             else
