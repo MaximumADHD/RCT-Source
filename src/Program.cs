@@ -860,8 +860,6 @@ namespace RobloxClientTracker
             if (!hasUpdate)
                 return false;
 
-            Console.Beep();
-
             // Copy some metadata generated during the studio installation.
             string studioDir = studio.GetStudioDirectory();
 
@@ -959,8 +957,8 @@ namespace RobloxClientTracker
             
             var contentFolders = new Dictionary<string, string>
             {
-                { "BuiltInPlugins", "BuiltInPlugins" },
-                { "BuiltInStandalonePlugins", "BuiltInStandalonePlugins" },
+                { "BuiltInPlugins", "" },
+                { "BuiltInStandalonePlugins", "" },
 
                 { "avatar", @"content\avatar" },
                 { "scripts", @"content\scripts" },
@@ -972,6 +970,9 @@ namespace RobloxClientTracker
             foreach (string destPath in contentFolders.Keys)
             {
                 string srcPath = contentFolders[destPath];
+
+                if (srcPath == "")
+                    srcPath = destPath;
                 
                 Task unpack = Task.Run(() =>
                 {
