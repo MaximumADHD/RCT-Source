@@ -492,7 +492,7 @@ namespace RobloxClientTracker
             return studioProcs;
         }
 
-        public async Task UpdateStudio()
+        public async Task<bool> UpdateStudio()
         {
             echo("Checking build installation...");
 
@@ -570,7 +570,11 @@ namespace RobloxClientTracker
                 
                 versionRegistry.SetValue("Version", versionId);
                 versionRegistry.SetValue("VersionGuid", buildVersion);
+
+                return true;
             }
+
+            return false;
         }
     }
 }

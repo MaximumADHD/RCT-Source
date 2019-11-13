@@ -35,9 +35,10 @@ namespace RobloxClientTracker
         const string ARG_UPDATE_FREQUENCY = "-updateFrequency";
         const string ARG_FORCE_VERSION_GUID = "-forceVersionGuid";
 
-        const ConsoleColor DARK_YELLOW = ConsoleColor.DarkYellow;
-        const ConsoleColor DARK_CYAN = ConsoleColor.DarkCyan;
-
+        public const ConsoleColor DARK_YELLOW = ConsoleColor.DarkYellow;
+        public const ConsoleColor DARK_GREEN = ConsoleColor.DarkGreen;
+        public const ConsoleColor DARK_CYAN = ConsoleColor.DarkCyan;
+        
         public const ConsoleColor MAGENTA = ConsoleColor.Magenta;
         public const ConsoleColor YELLOW = ConsoleColor.Yellow;
         public const ConsoleColor WHITE = ConsoleColor.White;
@@ -101,6 +102,18 @@ namespace RobloxClientTracker
             RedirectStandardOutput = true,
         };
 
+        public static FileLogConfig LogRbxm = new FileLogConfig()
+        {
+            Color = DARK_CYAN,
+            Stack = 3
+        };
+
+        public static FileLogConfig LogShader = new FileLogConfig()
+        {
+            Color = DARK_GREEN,
+            Stack = 2
+        };
+
         public static void print(string message, ConsoleColor color = GRAY)
         {
             Console.ForegroundColor = color;
@@ -131,13 +144,20 @@ namespace RobloxClientTracker
             return sanitized;
         }
 
-        public static void WriteFile(string path, string contents, bool log = false)
+        public static void WriteFile(string path, string contents, FileLogConfig? maybeConfig = null)
         {
             string sanitized = sanitizeString(contents);
 
-            if (log)
-                print($"Writing file: {localPath(path)}", ConsoleColor.DarkYellow);
+            if (maybeConfig.HasValue)
+            {
+                FileLogConfig config = maybeConfig.Value;
 
+                for (int i = 0; i < config.Stack; i++)
+                    Console.Write('\t');
+
+                print($"Writing file: {localPath(path)}", config.Color);
+            }
+            
             File.WriteAllText(path, sanitized, UTF8);
         }
 
@@ -198,12 +218,21 @@ namespace RobloxClientTracker
 
         static List<string> getChangedFiles(string branch, string filter)
         {
-            var query = git("diff", "--name-only", $"origin/{branch}", "--", filter);
+            var query = git("status", "-s");
             var result = new List<string>();
 
-            foreach (string line in query)
-                result.Add(line);
+            string pattern = filter.Replace("*", ".*");
 
+            foreach (string line in query)
+            {
+                string file = line.Substring(3);
+
+                if (!Regex.IsMatch(file, pattern))
+                    continue;
+
+                result.Add(file);
+            }
+            
             return result;
         }
 
@@ -391,7 +420,7 @@ namespace RobloxClientTracker
                 myManifest = convertToCSV(myManifest, "Name", "Shader Type");
 
                 string newShaderPathCsv = Path.Combine(newShaderDir, pack.Name + ".csv");
-                WriteFile(newShaderPathCsv, myManifest);
+                WriteFile(newShaderPathCsv, myManifest, LogShader);
             }
 
             var headers = new List<string>() { "Name", "Shader Type" };
@@ -421,7 +450,7 @@ namespace RobloxClientTracker
             manifest = convertToCSV(manifest, headers.ToArray());
 
             string manifestPath = Path.Combine(stageDir, "RobloxShaderData.csv");
-            WriteFile(manifestPath, manifest);
+            WriteFile(manifestPath, manifest, LogShader);
 
             print("Shaders unpacked!", GREEN);
         }
@@ -710,7 +739,7 @@ namespace RobloxClientTracker
                 if (source.Length > 0)
                 {
                     string filePath = Path.Combine(directory, name + extension);
-                    WriteFile(filePath, source, true);
+                    WriteFile(filePath, source, LogRbxm);
                 }
             }
             else if (at.IsA<LocalizationTable>())
@@ -721,7 +750,7 @@ namespace RobloxClientTracker
                 if (csv.Length > 0)
                 {
                     string filePath = Path.Combine(directory, name + ".csv");
-                    WriteFile(filePath, csv, true);
+                    WriteFile(filePath, csv, LogRbxm);
                 }
             }
             else if (at.IsA<StringValue>() && name != "AvatarPartScaleType")
@@ -732,7 +761,7 @@ namespace RobloxClientTracker
                 if (value.Length > 0)
                 {
                     string filePath = Path.Combine(directory, name + ".txt");
-                    WriteFile(filePath, value, true);
+                    WriteFile(filePath, value, LogRbxm);
                 }
             }
 
@@ -822,11 +851,16 @@ namespace RobloxClientTracker
             return pair[1] + ',' + pair[0];
         }
 
-        static async Task updateStage(ClientVersionInfo info)
+        static async Task<bool> updateStage(ClientVersionInfo info)
         {
             // Make sure Roblox Studio is up to date for this build.
             print("Syncing Roblox Studio...", ConsoleColor.Green);
-            await studio.UpdateStudio();
+            bool hasUpdate = await studio.UpdateStudio();
+
+            if (!hasUpdate)
+                return false;
+
+            Console.Beep();
 
             // Copy some metadata generated during the studio installation.
             string studioDir = studio.GetStudioDirectory();
@@ -938,7 +972,7 @@ namespace RobloxClientTracker
             foreach (string destPath in contentFolders.Keys)
             {
                 string srcPath = contentFolders[destPath];
-
+                
                 Task unpack = Task.Run(() =>
                 {
                     string srcFolder = Path.Combine(studioDir, srcPath);
@@ -951,7 +985,7 @@ namespace RobloxClientTracker
                     {
                         if (file.EndsWith(".rbxm") || file.EndsWith(".rbxmx"))
                         {
-                            print($"\t\tUnpacking {localPath(file)}", DARK_CYAN);
+                            print($"\t\tUnpacking {localPath(file)}", CYAN);
                             expandBinaryRbxmFile(file);
                         }
                         else if (file.EndsWith(".sig") || file.EndsWith(".mesh"))
@@ -975,6 +1009,7 @@ namespace RobloxClientTracker
             }
 
             await Task.WhenAll(taskPool);
+            return true;
         }
 
         static bool pushCommit(string label, string filter = ".")
@@ -1136,24 +1171,31 @@ namespace RobloxClientTracker
 
                     if (FORCE_UPDATE || info.Guid != currentVersion)
                     {
-                        print("Update detected!", YELLOW);
-                        await updateStage(info);
+                        print("Update detected?", YELLOW);
+                        bool updated = await updateStage(info);
 
-                        // Create two commits:
-                        // - One for package files.
-                        // - One for everything else.
+                        if (updated)
+                        {
+                            // Create two commits:
+                            // - One for package files.
+                            // - One for everything else.
 
-                        string versionId = info.Version;
-                        print("Creating commits...", YELLOW);
+                            string versionId = info.Version;
+                            print("Creating commits...", YELLOW);
 
-                        bool didSubmitPackages = pushCommit($"{versionId} (Packages)", "*/Packages/*");
-                        bool didSubmitCore = pushCommit(versionId);
+                            bool didSubmitPackages = pushCommit($"{versionId} (Packages)", "*/Packages/*");
+                            bool didSubmitCore = pushCommit(versionId);
 
-                        if (didSubmitPackages || didSubmitCore)
-                            print("Done!", GREEN);
-                        
-                        currentVersion = info.Guid;
-                        BranchRegistry.SetValue("Version", info.Guid);
+                            if (didSubmitPackages || didSubmitCore)
+                                print("Done!", GREEN);
+
+                            currentVersion = info.Guid;
+                            BranchRegistry.SetValue("Version", info.Guid);
+                        }
+                        else
+                        {
+                            print("Nevermind?", RED);
+                        }
                     }
                     else
                     {

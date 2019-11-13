@@ -84,7 +84,7 @@ namespace RobloxClientTracker
                     contents = contents.Replace("_" + sValue, name);
                 }
 
-                Program.WriteFile(shaderPath, contents);
+                Program.WriteFile(shaderPath, contents, Program.LogShader);
             }
         }
     }

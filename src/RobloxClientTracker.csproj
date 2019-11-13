@@ -108,6 +108,7 @@
     <Compile Include="Utility\Localization.cs" />
     <Compile Include="Program.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
+    <Compile Include="Utility\FileLogConfig.cs" />
     <Compile Include="Utility\NameDemangler.cs" />
     <Compile Include="Utility\RegistryExtensions.cs" />
     <Compile Include="Utility\ShaderPack.cs" />
