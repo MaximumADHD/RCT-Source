@@ -25,19 +25,28 @@ namespace RobloxClientTracker.Properties {
         
         [global::System.Configuration.ApplicationScopedSettingAttribute()]
         [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
-        [global::System.Configuration.DefaultSettingValueAttribute("Roblox-Client-Tracker")]
-        public string RepoName {
+        [global::System.Configuration.DefaultSettingValueAttribute("CloneTrooper1019")]
+        public string RepoOwner {
             get {
-                return ((string)(this["RepoName"]));
+                return ((string)(this["RepoOwner"]));
             }
         }
         
         [global::System.Configuration.ApplicationScopedSettingAttribute()]
         [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
-        [global::System.Configuration.DefaultSettingValueAttribute("CloneTrooper1019")]
-        public string RepoOwner {
+        [global::System.Configuration.DefaultSettingValueAttribute("Roblox-Client-Tracker")]
+        public string ClientRepoName {
             get {
-                return ((string)(this["RepoOwner"]));
+                return ((string)(this["ClientRepoName"]));
+            }
+        }
+        
+        [global::System.Configuration.ApplicationScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("Roblox-FFlag-Tracker")]
+        public string FFlagRepoName {
+            get {
+                return ((string)(this["FFlagRepoName"]));
             }
         }
         

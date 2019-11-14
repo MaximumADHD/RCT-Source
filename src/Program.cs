@@ -23,11 +23,18 @@ namespace RobloxClientTracker
 {
     class Program
     {
+        public enum TrackMode
+        {
+            Client,
+            FastFlags
+        }
+
         public static RegistryKey RootRegistry;
         public static RegistryKey BranchRegistry;
 
         const string ARG_BRANCH = "-branch";
         const string ARG_PARENT = "-parent";
+        const string ARG_TRACK_MODE = "-trackMode";
         const string ARG_FORCE_REBASE = "-forceRebase";
         const string ARG_FORCE_UPDATE = "-forceUpdate";
         const string ARG_FORCE_COMMIT = "-forceCommit";
@@ -54,6 +61,7 @@ namespace RobloxClientTracker
 
         static int UPDATE_FREQUENCY = 5;
         static bool VERBOSE_GIT_LOGS = false;
+        static TrackMode TRACK_MODE = TrackMode.Client;
 
         public static string FORCE_VERSION_GUID = "";
         public static string FORCE_VERSION_ID = "";
@@ -338,6 +346,7 @@ namespace RobloxClientTracker
             {
                 FileName = luaJit,
                 Arguments = $"{qtExtract} {studioPath} --chunk 1 --output {extractDir}",
+
                 CreateNoWindow = true,
                 UseShellExecute = false
             };
@@ -1069,19 +1078,15 @@ namespace RobloxClientTracker
             }
         }
 
-        static async Task MainAsync()
+        static bool initGitBinding(string repository)
         {
-            ServicePointManager.SecurityProtocol = SecurityProtocolType.Tls | SecurityProtocolType.Tls11 | SecurityProtocolType.Tls12 | SecurityProtocolType.Ssl3;
-
-            string currentVersion = BranchRegistry.GetString("Version");
             string gitBinding = Path.Combine(stageDir, ".git");
-            
+
             if (!Directory.Exists(gitBinding))
             {
                 print($"Assembling stage for {branch}...", MAGENTA);
+
                 var settings = Settings.Default;
-                
-                string repository = settings.RepoName;
                 string owner = settings.RepoOwner;
 
                 string userProfile = Environment.GetEnvironmentVariable("UserProfile");
@@ -1113,6 +1118,118 @@ namespace RobloxClientTracker
                 string email = settings.BotEmail;
                 git("config", "--local", "user.email", email);
 
+                return true;
+            }
+
+            return false;
+        }
+
+        static async Task TrackFFlagsAsync()
+        {
+            // Initialize Repository
+            initGitBinding(Settings.Default.FFlagRepoName);
+
+            // Start tracking...
+            const string flagEndpoint = "https://clientsettingscdn.roblox.com/v1/settings/application?applicationName=";
+
+            var platforms = new List<string>()
+            {
+                "PCDesktopClient",
+                "MacDesktopClient",
+                "PCStudioBootstrapper",
+                "MacStudioBootstrapper",
+                "PCClientBootstrapper",
+                "MacClientBootstrapper",
+                "XboxClient",
+                "AndroidApp",
+                "iOSApp",
+                "StudioApp"
+            };
+
+            print("Main thread starting!", MAGENTA);
+            git("reset --hard origin/master");
+
+            while (true)
+            {
+                print("Updating flags...", CYAN);
+
+                var taskPool = new List<Task>();
+
+                foreach (string platform in platforms)
+                {
+                    print($"\tUpdating platform {platform}...");
+
+                    Task updatePlatform = Task.Run(async () =>
+                    {
+                        string json = "";
+
+                        using (WebClient http = new WebClient())
+                        {
+                            http.Headers.Set("UserAgent", "Roblox/WinInet");
+                            json = await http.DownloadStringTaskAsync(flagEndpoint + platform);
+                        }
+
+                        using (var jsonText = new StringReader(json))
+                        {
+                            JsonTextReader reader = new JsonTextReader(jsonText);
+
+                            JObject root = JObject.Load(reader);
+                            JObject appSettings = root.Value<JObject>("applicationSettings");
+
+                            var keys = new List<string>();
+
+                            foreach (var pair in appSettings)
+                                keys.Add(pair.Key);
+
+                            var result = new StringBuilder();
+                            int testInt = 0;
+
+                            result.AppendLine("{");
+                            keys.Sort();
+
+                            for (int i = 0; i < keys.Count; i++)
+                            {
+                                string key = keys[i];
+                                string value = appSettings.Value<string>(key);
+
+                                if (i != 0)
+                                    result.Append(",\r\n");
+
+                                if (value == "True" || value == "False")
+                                    value = value.ToLower();
+                                else if (!int.TryParse(value, out testInt))
+                                    value = '"' + value + '"';
+                                 
+                                result.Append($"\t\"{key}\": {value}");
+                            }
+
+                            result.Append("\r\n}");
+
+                            string filePath = Path.Combine(stageDir, platform + ".json");
+                            File.WriteAllText(filePath, result.ToString());
+                        }
+                    });
+
+                    taskPool.Add(updatePlatform);
+                }
+
+                await Task.WhenAll(taskPool);
+
+                string timeStamp = DateTime.Now.ToString();
+                pushCommit(timeStamp);
+
+                print($"Next update check in {UPDATE_FREQUENCY} minutes.", YELLOW);
+                await Task.Delay(UPDATE_FREQUENCY * 60000);
+            }
+        }
+
+        static async Task TrackClientAsync()
+        {
+            string currentVersion = BranchRegistry.GetString("Version");
+            bool init = initGitBinding(Settings.Default.ClientRepoName);
+
+            if (init)
+            {
                 if (branch != "roblox")
                 {
                     if (parent != "roblox")
@@ -1262,20 +1379,33 @@ namespace RobloxClientTracker
             if (argMap.ContainsKey(ARG_FORCE_VERSION_GUID))
                 FORCE_VERSION_GUID = argMap[ARG_FORCE_VERSION_GUID];
 
+            if (argMap.ContainsKey(ARG_TRACK_MODE))
+                Enum.TryParse(argMap[ARG_TRACK_MODE], out TRACK_MODE);
+
+            if (TRACK_MODE == TrackMode.FastFlags)
+            {
+                if (!argMap.ContainsKey(ARG_UPDATE_FREQUENCY))
+                    UPDATE_FREQUENCY = 2;
+
+                branch = "fflags";
+            }
             #endregion
 
             RootRegistry = Registry.CurrentUser.Open("Software", "RobloxClientTracker");
             BranchRegistry = RootRegistry.Open(branch);
 
-            branch = branch.ToLower();
             trunk = createDirectory(@"C:\Roblox-Client-Tracker");
             stageDir = createDirectory(trunk, "stage", branch);
 
-            studio = new StudioBootstrapper(branch);
-            studioPath = studio.GetStudioPath();
+            ServicePointManager.SecurityProtocol = SecurityProtocolType.Tls | SecurityProtocolType.Tls11 | SecurityProtocolType.Tls12 | SecurityProtocolType.Ssl3;
+            Task mainThread = null;
 
-            Task mainThread = Task.Run(() => MainAsync());
-            mainThread.Wait();
+            if (TRACK_MODE == TrackMode.Client)
+                mainThread = Task.Run(() => TrackClientAsync());
+            else if (TRACK_MODE == TrackMode.FastFlags)
+                mainThread = Task.Run(() => TrackFFlagsAsync());
+
+            mainThread?.Wait();
         }
     }
 }

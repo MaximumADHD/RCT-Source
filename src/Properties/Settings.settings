@@ -2,11 +2,14 @@
 <SettingsFile xmlns="http://schemas.microsoft.com/VisualStudio/2004/01/settings" CurrentProfile="(Default)" GeneratedClassNamespace="RobloxClientTracker.Properties" GeneratedClassName="Settings">
   <Profiles />
   <Settings>
-    <Setting Name="RepoName" Type="System.String" Scope="Application">
-      <Value Profile="(Default)">Roblox-Client-Tracker</Value>
-    </Setting>
     <Setting Name="RepoOwner" Type="System.String" Scope="Application">
       <Value Profile="(Default)">CloneTrooper1019</Value>
+    </Setting>
+    <Setting Name="ClientRepoName" Type="System.String" Scope="Application">
+      <Value Profile="(Default)">Roblox-Client-Tracker</Value>
+    </Setting>
+    <Setting Name="FFlagRepoName" Type="System.String" Scope="Application">
+      <Value Profile="(Default)">Roblox-FFlag-Tracker</Value>
     </Setting>
     <Setting Name="BotName" Type="System.String" Scope="Application">
       <Value Profile="(Default)">Roblox Client Tracker</Value>
