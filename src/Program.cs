@@ -1267,6 +1267,9 @@ namespace RobloxClientTracker
                 }
             }
 
+            studio = new StudioBootstrapper(branch);
+            studioPath = studio.GetStudioPath();
+
             print("Main thread starting!", MAGENTA);
 
             if (FORCE_REBASE)
