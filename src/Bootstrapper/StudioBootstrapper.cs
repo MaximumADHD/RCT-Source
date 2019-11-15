@@ -213,8 +213,8 @@ namespace RobloxClientTracker
         {
             string binaryType = GetStudioBinaryType();
 
-            if (branch == "roblox")
-                return await ClientVersionInfo.Get(binaryType);
+            /*if (branch == "roblox")
+                return await ClientVersionInfo.Get(binaryType);*/
 
             if (fastGuid == "")
                 fastGuid = await GetFastVersionGuid(branch);
@@ -467,7 +467,7 @@ namespace RobloxClientTracker
             return studioProcs;
         }
 
-        public async Task<bool> UpdateStudio()
+        public async Task UpdateStudio()
         {
             echo("Checking build installation...");
 
@@ -545,11 +545,7 @@ namespace RobloxClientTracker
                 
                 versionRegistry.SetValue("Version", versionId);
                 versionRegistry.SetValue("VersionGuid", buildVersion);
-
-                return true;
             }
-
-            return false;
         }
     }
 }

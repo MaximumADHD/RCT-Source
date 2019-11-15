@@ -233,11 +233,41 @@ namespace RobloxClientTracker
 
             foreach (string line in query)
             {
+                string type = line.Substring(0, 2).Trim();
                 string file = line.Substring(3);
 
                 if (!Regex.IsMatch(file, pattern))
                     continue;
 
+                log("\t\t");
+
+                switch (type)
+                {
+                    case "A":
+                        log(type, GREEN);
+                        break;
+                    case "D":
+                        log(type, RED);
+                        break;
+                    case "R":
+                        log(type, MAGENTA);
+                        break;
+                    case "C":
+                        log(type, CYAN);
+                        break;
+                    case "M":
+                        log(type, YELLOW);
+                        break;
+                    case "U":
+                        log(type, GRAY);
+                        break;
+                    default:
+                        log("?", BLUE);
+                        break;
+                    //
+                }
+
+                print($" {file}", WHITE);
                 result.Add(file);
             }
             
@@ -378,7 +408,7 @@ namespace RobloxClientTracker
             var shaders = new Dictionary<string, string>();
             var shaderPacks = new Dictionary<string, HashSet<string>>();
 
-            string newShaderDir = resetDirectory(stageDir, "shaders");
+            string newShaderDir = createDirectory(stageDir, "shaders");
             print("Unpacking shader packs...", GREEN);
 
             foreach (string shaderPath in Directory.GetFiles(shaderDir))
@@ -393,7 +423,7 @@ namespace RobloxClientTracker
                 shaderFiles.Sort();
 
                 print($"\tUnpacking shader file {packName}...", GREEN);
-                pack.UnpackShader(newShaderDir);
+                HashSet<string> hashes = pack.UnpackShader(newShaderDir);
 
                 foreach (ShaderFile file in shaderFiles)
                 {
@@ -864,10 +894,7 @@ namespace RobloxClientTracker
         {
             // Make sure Roblox Studio is up to date for this build.
             print("Syncing Roblox Studio...", ConsoleColor.Green);
-            bool hasUpdate = await studio.UpdateStudio();
-
-            if (!hasUpdate)
-                return false;
+            await studio.UpdateStudio();
 
             // Copy some metadata generated during the studio installation.
             string studioDir = studio.GetStudioDirectory();
@@ -952,15 +979,7 @@ namespace RobloxClientTracker
                 Task minerTask = Task.Run(minerAction);
                 taskPool.Add(minerTask);
             }
-
-            await Task.WhenAll(taskPool);
-
-            foreach (Task task in taskPool)
-                if (task.Status == TaskStatus.Faulted)
-                    throw task.Exception;
             
-            taskPool.Clear();
-
             // Unpack and transfer specific content data from the studio build.
             print("Unpacking content data...", CYAN);
             
@@ -1019,6 +1038,11 @@ namespace RobloxClientTracker
             }
 
             await Task.WhenAll(taskPool);
+
+            foreach (Task task in taskPool)
+                if (task.Status == TaskStatus.Faulted)
+                    throw task.Exception;
+
             return true;
         }
 
@@ -1289,31 +1313,24 @@ namespace RobloxClientTracker
 
                     if (FORCE_UPDATE || info.Guid != currentVersion)
                     {
-                        print("Update detected?", YELLOW);
-                        bool updated = await updateStage(info);
+                        print("Update detected!", YELLOW);
+                        await updateStage(info);
 
-                        if (updated)
-                        {
-                            // Create two commits:
-                            // - One for package files.
-                            // - One for everything else.
+                        // Create two commits:
+                        // - One for package files.
+                        // - One for everything else.
 
-                            string versionId = info.Version;
-                            print("Creating commits...", YELLOW);
+                        string versionId = info.Version;
+                        print("Creating commits...", YELLOW);
 
-                            bool didSubmitPackages = pushCommit($"{versionId} (Packages)", "*/Packages/*");
-                            bool didSubmitCore = pushCommit(versionId);
+                        bool didSubmitPackages = pushCommit($"{versionId} (Packages)", "*/Packages/*");
+                        bool didSubmitCore = pushCommit(versionId);
 
-                            if (didSubmitPackages || didSubmitCore)
-                                print("Done!", GREEN);
+                        if (didSubmitPackages || didSubmitCore)
+                            print("Done!", GREEN);
 
-                            currentVersion = info.Guid;
-                            BranchRegistry.SetValue("Version", info.Guid);
-                        }
-                        else
-                        {
-                            print("Nevermind?", RED);
-                        }
+                        currentVersion = info.Guid;
+                        BranchRegistry.SetValue("Version", info.Guid);
                     }
                     else
                     {

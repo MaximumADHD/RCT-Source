@@ -5,6 +5,8 @@ using System.Linq;
 using System.Text;
 using System.Text.RegularExpressions;
 
+using Microsoft.Win32;
+
 namespace RobloxClientTracker
 {
     public enum ShaderType
@@ -33,6 +35,11 @@ namespace RobloxClientTracker
             return $"[{Type}] {Name}";
         }
 
+        public string RegistryKey
+        {
+            get { return $"{Group}/{Name}"; }
+        }
+
         public int CompareTo(object obj)
         {
             int result;
@@ -51,7 +58,7 @@ namespace RobloxClientTracker
             return result;
         }
 
-        public void WriteFile(string dir)
+        public void WriteFile(string dir, RegistryKey container)
         {
             string contents = Program.UTF8.GetString(Buffer);
 
@@ -84,7 +91,13 @@ namespace RobloxClientTracker
                     contents = contents.Replace("_" + sValue, name);
                 }
 
-                Program.WriteFile(shaderPath, contents, Program.LogShader);
+                string currentHash = container.GetString(RegistryKey);
+
+                if (currentHash != Hash)
+                {
+                    container.SetValue(RegistryKey, Hash);
+                    Program.WriteFile(shaderPath, contents, Program.LogShader);
+                }
             }
         }
     }
@@ -119,9 +132,15 @@ namespace RobloxClientTracker
             return value;
         }
 
-        public void UnpackShader(string exportDir)
+        public HashSet<string> UnpackShader(string exportDir)
         {
+            var shaderManifest = Program.BranchRegistry.Open("ShaderManifest");
+            string shaderKey = Name.Replace("shaders_", "");
+            var shaderReg = shaderManifest.Open(shaderKey);
+
             var hashes = new HashSet<string>();
+            var names = new HashSet<string>();
+
             string root = Groups[0];
 
             string unpackDir = Path.Combine(exportDir, Name);
@@ -133,20 +152,41 @@ namespace RobloxClientTracker
             foreach (ShaderFile rootShader in rootShaders)
             {
                 hashes.Add(rootShader.Hash);
-                rootShader.WriteFile(unpackDir);
+                names.Add(rootShader.RegistryKey);
+                rootShader.WriteFile(unpackDir, shaderReg);
             }
 
             foreach (ShaderFile otherShader in otherShaders)
             {
-                string GroupDir = Path.Combine(unpackDir, otherShader.Group);
-                Directory.CreateDirectory(GroupDir);
+                string groupDir = Path.Combine(unpackDir, otherShader.Group);
+                Directory.CreateDirectory(groupDir);
 
                 if (!hashes.Contains(otherShader.Hash))
                 {
                     hashes.Add(otherShader.Hash);
-                    otherShader.WriteFile(GroupDir);
+                    names.Add(otherShader.RegistryKey);
+                    otherShader.WriteFile(groupDir, shaderReg);
                 }
             }
+
+            string[] oldNames = shaderReg.GetValueNames()
+                .Except(names)
+                .ToArray();
+
+            foreach (string oldName in oldNames)
+            {
+                string filePath = Path.Combine(unpackDir, oldName);
+
+                if (File.Exists(filePath))
+                    File.Delete(filePath);
+
+                shaderReg.DeleteValue(oldName);
+            }
+
+            if (shaderReg.GetValueNames().Length == 0)
+                shaderManifest.DeleteSubKey(shaderKey);
+
+            return hashes;
         }
 
         public ShaderPack(string filePath)
