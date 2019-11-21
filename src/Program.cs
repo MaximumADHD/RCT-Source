@@ -2,16 +2,13 @@
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
-using System.IO.Compression;
 using System.Net;
 using System.Linq;
 using System.Text;
-using System.Reflection;
 using System.Threading.Tasks;
 using System.Text.RegularExpressions;
 
 using RobloxFiles;
-using Roblox.Reflection;
 
 using Microsoft.Win32;
 using RobloxClientTracker.Properties;
@@ -21,7 +18,7 @@ using Newtonsoft.Json.Linq;
 
 namespace RobloxClientTracker
 {
-    class Program
+    public class Program
     {
         public enum TrackMode
         {
@@ -31,6 +28,8 @@ namespace RobloxClientTracker
 
         public static RegistryKey RootRegistry;
         public static RegistryKey BranchRegistry;
+
+        public static Encoding UTF8 = new UTF8Encoding(false);
 
         const string ARG_BRANCH = "-branch";
         const string ARG_PARENT = "-parent";
@@ -78,30 +77,18 @@ namespace RobloxClientTracker
             "DeepStrings.txt",
         };
 
-        static Dictionary<string, byte[]> luaFiles = new Dictionary<string, byte[]>
-        {
-            { "QtExtract.lua",     Resources.QtExtract_lua    },
-            { "PEParser.lua",      Resources.PEParser_lua     },
-            { "BinaryReader.lua",  Resources.BinaryReader_lua },
-            { "Deflate.lua",       Resources.Deflate_lua      },
-            { "Bit.lua",           Resources.Bit_lua          },
-        };
-
         static string branch = "roblox";
         static string parent = "roblox";
 
-        static string trunk;
-        static string stageDir;
+        public static string Trunk;
+        public static string StageDir;
 
-        static string studioPath;
-        static StudioBootstrapper studio;
-
-        public static Encoding UTF8 = new UTF8Encoding(false);
-        public static string Trunk => trunk;
+        public static string StudioPath;
+        public static StudioBootstrapper Studio;
 
         static Dictionary<string, string> argMap = new Dictionary<string, string>();
         
-        static ProcessStartInfo gitExecute = new ProcessStartInfo
+        static readonly ProcessStartInfo gitExecute = new ProcessStartInfo
         {
             FileName = "git",
             CreateNoWindow = true,
@@ -110,16 +97,10 @@ namespace RobloxClientTracker
             RedirectStandardOutput = true,
         };
 
-        public static FileLogConfig LogRbxm = new FileLogConfig()
+        public static readonly FileLogConfig LogRbxm = new FileLogConfig()
         {
             Color = DARK_CYAN,
             Stack = 3
-        };
-
-        public static FileLogConfig LogShader = new FileLogConfig()
-        {
-            Color = DARK_GREEN,
-            Stack = 2
         };
 
         public static void print(string message, ConsoleColor color = GRAY)
@@ -139,7 +120,7 @@ namespace RobloxClientTracker
 
         public static string localPath(string globalPath)
         {
-            return globalPath.Substring(stageDir.Length + 1);
+            return globalPath.Substring(StageDir.Length + 1);
         }
 
         static string sanitizeString(string str)
@@ -155,7 +136,7 @@ namespace RobloxClientTracker
         public static void WriteFile(string path, string contents, FileLogConfig? maybeConfig = null)
         {
             string sanitized = sanitizeString(contents);
-
+            
             if (maybeConfig.HasValue)
             {
                 FileLogConfig config = maybeConfig.Value;
@@ -171,7 +152,7 @@ namespace RobloxClientTracker
 
         public static IEnumerable<string> git(params string[] args)
         {
-            Directory.SetCurrentDirectory(stageDir);
+            Directory.SetCurrentDirectory(StageDir);
 
             string command = string.Join(" ", args);
             Process git;
@@ -288,7 +269,7 @@ namespace RobloxClientTracker
             return (behind > 0);
         }
 
-        static string createDirectory(params string[] traversal)
+        public static string CreateDirectory(params string[] traversal)
         {
             string dir = Path.Combine(traversal);
 
@@ -298,19 +279,19 @@ namespace RobloxClientTracker
             return dir;
         }
 
-        static string resetDirectory(params string[] traversal)
+        public static string ResetDirectory(params string[] traversal)
         {
             string dir = Path.Combine(traversal);
 
             if (Directory.Exists(dir))
                 Directory.Delete(dir, true);
 
-            return createDirectory(dir);
+            return CreateDirectory(dir);
         }
 
         static void copyDirectory(string source, string target)
         {
-            string dest = resetDirectory(target);
+            string dest = ResetDirectory(target);
             DirectoryInfo src = new DirectoryInfo(source);
 
             foreach (var file in src.GetFiles())
@@ -326,444 +307,28 @@ namespace RobloxClientTracker
                 copyDirectory(subSrc, subTarget);
             }
         }
-
-        static void deployLuaJit(string dir)
+        
+        static void expandBinaryRbxmFile(Instance inst, string parentDir)
         {
-            resetDirectory(dir);
+            string name = inst.Name;
 
-            using (var stream = new MemoryStream(Resources.LuaJIT_zip))
-            {
-                ZipArchive luaJit = new ZipArchive(stream, ZipArchiveMode.Read);
-
-                foreach (ZipArchiveEntry entry in luaJit.Entries)
-                {
-                    string fullPath = Path.Combine(dir, entry.FullName);
-
-                    if (fullPath.EndsWith("/"))
-                    {
-                        Directory.CreateDirectory(fullPath);
-                        continue;
-                    }
-
-                    entry.ExtractToFile(fullPath);
-                }
-            }
-
-            foreach (string fileName in luaFiles.Keys)
-            {
-                byte[] luaFile = luaFiles[fileName];
-                string filePath = Path.Combine(dir, fileName);
-
-                File.WriteAllBytes(filePath, luaFile);
-            }
-        }
-
-        static void extractQtResources()
-        {
-            string extractDir = resetDirectory(stageDir, "QtResources");
-            string luaDir = Path.Combine(trunk, "lua");
-
-            string luaJit = Path.Combine(luaDir, "luajit.cmd");
-            string qtExtract = Path.Combine(luaDir, "QtExtract.lua");
-
-            if (!File.Exists(luaJit) || !File.Exists(qtExtract))
-            {
-                print("Deploying LuaJIT...", MAGENTA);
-                deployLuaJit(luaDir);
-            }
-
-            ProcessStartInfo extract = new ProcessStartInfo()
-            {
-                FileName = luaJit,
-                Arguments = $"{qtExtract} {studioPath} --chunk 1 --output {extractDir}",
-
-                CreateNoWindow = true,
-                UseShellExecute = false
-            };
-
-            print("Extracting Qt Resources...", MAGENTA);
-
-            Process process = Process.Start(extract);
-            process.WaitForExit();
-
-            foreach (string file in Directory.GetFiles(extractDir, "*.xml", SearchOption.AllDirectories))
-            {
-                FileInfo info = new FileInfo(file);
-                string newPath = Path.Combine(stageDir, info.Name);
-
-                if (File.Exists(newPath))
-                    File.Delete(newPath);
-
-                File.Move(file, newPath);
-            }
-        }
-
-        static void extractShaderData()
-        {
-            string studioDir = studio.GetStudioDirectory();
-            string shaderDir = Path.Combine(studioDir, "shaders");
-
-            var packNames = new List<string>();
-
-            var shaders = new Dictionary<string, string>();
-            var shaderPacks = new Dictionary<string, HashSet<string>>();
-
-            string newShaderDir = createDirectory(stageDir, "shaders");
-            print("Unpacking shader packs...", GREEN);
-
-            foreach (string shaderPath in Directory.GetFiles(shaderDir))
-            {
-                ShaderPack pack = new ShaderPack(shaderPath);
-                var myShaders = new Dictionary<string, string>();
-
-                string packName = pack.Name.Replace("shaders_", "");
-                packNames.Add(packName);
-
-                List<ShaderFile> shaderFiles = pack.Shaders.ToList();
-                shaderFiles.Sort();
-
-                print($"\tUnpacking shader file {packName}...", GREEN);
-                HashSet<string> hashes = pack.UnpackShader(newShaderDir);
-
-                foreach (ShaderFile file in shaderFiles)
-                {
-                    string shaderType = Enum.GetName(typeof(ShaderType), file.ShaderType);
-                    string shader = file.Name;
-
-                    if (shaders.ContainsKey(shader) && shaderType != shaders[shader])
-                        Debugger.Break();
-
-                    shaders[shader] = shaderType;
-                    myShaders[shader] = shaderType;
-
-                    if (!shaderPacks.ContainsKey(shader))
-                        shaderPacks.Add(shader, new HashSet<string>());
-
-                    shaderPacks[shader].Add(packName);
-                }
-
-                var myLines = new List<string>();
-
-                foreach (string shader in myShaders.Keys)
-                {
-                    string type = myShaders[shader];
-                    myLines.Add(shader);
-                    myLines.Add(type);
-                }
-
-                string[] myManifestLines = myLines
-                    .Select(line => line.ToString())
-                    .ToArray();
-
-                string myManifest = string.Join("\r\n", myManifestLines);
-                myManifest = convertToCSV(myManifest, "Name", "Shader Type");
-
-                string newShaderPathCsv = Path.Combine(newShaderDir, pack.Name + ".csv");
-                WriteFile(newShaderPathCsv, myManifest, LogShader);
-            }
-
-            var headers = new List<string>() { "Name", "Shader Type" };
-            headers.AddRange(packNames);
-
-            var shaderNames = shaders.Keys.ToList();
-            shaderNames.Sort();
-
-            var lines = new List<string>();
-
-            foreach (string shader in shaderNames)
-            {
-                string type = shaders[shader];
-                var packs = shaderPacks[shader];
-
-                lines.Add(shader);
-                lines.Add(type);
-
-                foreach (string packName in packNames)
-                {
-                    string check = packs.Contains(packName) ? "✔" : "❌";
-                    lines.Add(check);
-                }
-            }
-
-            string manifest = string.Join("\r\n", lines);
-            manifest = convertToCSV(manifest, headers.ToArray());
-
-            string manifestPath = Path.Combine(stageDir, "RobloxShaderData.csv");
-            WriteFile(manifestPath, manifest, LogShader);
-
-            print("Shaders unpacked!", GREEN);
-        }
-
-        static void scanFastFlags()
-        {
-            string localAppData = Environment.GetEnvironmentVariable("LocalAppData");
-            string clientSettings = resetDirectory(localAppData, "Roblox", "ClientSettings");
-
-            string settingsPath = Path.Combine(clientSettings, "StudioAppSettings.json");
-            File.WriteAllText(settingsPath, "");
-
-            SystemEvent show = new SystemEvent("StudioNoSplashScreen");
-            SystemEvent start = new SystemEvent("ClientTrackerFlagScan");
-
-            print("Starting FFlag scan...", YELLOW);
-
-            Process update = Process.Start(new ProcessStartInfo()
-            {
-                FileName = studioPath,
-                Arguments = $"-startEvent {start.Name} -showEvent {show.Name}"
-            });
-
-            print("\tWaiting for signal from studio...", YELLOW);
-            start.WaitOne();
-
-            int timeOut = 0;
-            const int numTries = 128;
-
-            print("\tWaiting for StudioAppSettings.json to be written...", YELLOW);
-            FileInfo info = new FileInfo(settingsPath);
-
-            while (timeOut < numTries)
-            {
-                info.Refresh();
-
-                if (info.Length > 0)
-                {
-                    update.Kill();
-                    break;
-                }
-
-                print($"\t\t({++timeOut}/{numTries} tries until giving up...)", YELLOW);
-
-                var delay = Task.Delay(30);
-                delay.Wait();
-            }
-
-            string file = File.ReadAllText(settingsPath);
-            var flags = new List<string>();
-
-            using (var jsonText = new StringReader(file))
-            {
-                JsonTextReader reader = new JsonTextReader(jsonText);
-                JObject flagData = JObject.Load(reader);
-
-                foreach (var pair in flagData)
-                {
-                    string flagName = pair.Key;
-                    flags.Add(flagName);
-                }
-            }
-
-            flags.Sort();
-            print("Flag Scan completed!", YELLOW);
-
-            string flagsPath = Path.Combine(stageDir, "FVariables.txt");
-            string result = string.Join("\r\n", flags);
-
-            WriteFile(flagsPath, result);
-        }
-
-        static void updateApiDump()
-        {
-            string jsonFile = Path.Combine(stageDir, "API-Dump.json");
-            string json = File.ReadAllText(jsonFile);
-
-            var api = new ReflectionDatabase(jsonFile);
-            var dumper = new ReflectionDumper(api);
-
-            string dump = dumper.DumpApi(ReflectionDumper.DumpUsingTxt);
-            string exportPath = Path.Combine(stageDir, "API-Dump.txt");
-
-            WriteFile(exportPath, dump);
-        }
-
-        static List<string> hackOutPattern(string source, string pattern)
-        {
-            MatchCollection matches = Regex.Matches(source, pattern);
-            List<string> lines = new List<string>();
-
-            foreach (Match match in matches)
-            {
-                string matchStr = match.Groups[0].ToString();
-
-                if (matchStr.Length <= 4)
-                    continue;
-
-                if (lines.Contains(matchStr))
-                    continue;
-
-                string firstChar = matchStr.Substring(0, 1);
-                Match sanitize = Regex.Match(firstChar, "^[A-z_%*'-]");
-
-                if (sanitize.Length == 0)
-                    continue;
-
-                lines.Add(matchStr);
-            }
-
-            lines.Sort();
-            return lines;
-        }
-
-        static void extractDeepStrings(string file)
-        {
-            print("Extracting Deep Strings...", MAGENTA);
-            MatchCollection matches = Regex.Matches(file, "([A-Z][A-z][A-z_0-9.]{8,256})+[A-z0-9]?");
-
-            var lines = matches.Cast<Match>()
-                .Select(match => match.Value)
-                .OrderBy(str => str)
-                .Distinct();
-
-            string deepStrings = string.Join("\n", lines);
-            string deepStringsPath = Path.Combine(stageDir, "DeepStrings.txt");
-
-            WriteFile(deepStringsPath, deepStrings);
-        }
-
-        static string extractCppTypes(string file)
-        {
-            print("Extracting CPP types...", MAGENTA);
-
-            List<string> classes = hackOutPattern(file, "AV[A-z][A-z0-9_@?]+");
-            List<string> enums = hackOutPattern(file, "AW4[A-z0-9_@]+");
-
-            StringBuilder builder = new StringBuilder();
-            NameDemangler RBX = new NameDemangler("RBX");
-
-            foreach (string linkerChunk in classes)
-            {
-                if (linkerChunk.Length > 8)
-                {
-                    string data = linkerChunk.Substring(2);
-                    string lineEnd = data.Substring(data.Length - 6);
-
-                    if (lineEnd == "@RBX@@")
-                    {
-                        string[] chunks = data.Split('@');
-                        NameDemangler currentTree = RBX;
-
-                        for (int i = chunks.Length - 1; i >= 0; i--)
-                        {
-                            string chunk = chunks[i];
-
-                            if (chunk.Length > 0 && chunk != "RBX")
-                            {
-                                currentTree = currentTree.Add(chunk);
-                            }
-                        }
-                    }
-                }
-            }
-
-            RBX.WriteTree(builder);
-            return builder.ToString();
-        }
-
-        static void extractStudioStrings()
-        {
-            string file = File.ReadAllText(studioPath);
-
-            Task cppTypes = Task.Run(() => extractCppTypes(file));
-            Task deepStrings = Task.Run(() => extractDeepStrings(file));
-
-            Task extraction = Task.WhenAll(cppTypes, deepStrings);
-            extraction.Wait();
-        }
-
-        static string localeTableToCSV(LocalizationTable table)
-        {
-            Type entryType = typeof(LocalizationEntry);
-            var entries = LocalizationEntry.GetEntries(table);
-
-            // Select all distinct language definitions from the table entries.
-            string[] languages = entries
-                .SelectMany(entry => entry.Values
-                    .Where(pair => pair.Value.Length > 0)
-                    .Select(pair => pair.Key))
-                .Distinct()
-                .OrderBy(key => key)
-                .ToArray();
-
-            // Select headers whose columns actually have content.
-            string[] headers = new string[3] { "Key", "Source", "Context" }
-                .Select(header => entryType.GetField(header))
-                .Where(field => entries
-                    .Any(entry => field.GetValue(entry) as string != ""))
-                .Select(field => field.Name)
-                .Concat(languages)
-                .ToArray();
-
-            var lines = new List<string>();
-            var fields = new Dictionary<string, FieldInfo>();
-
-            foreach (LocalizationEntry entry in entries)
-            {
-                foreach (string header in headers)
-                {
-                    string value = "";
-
-                    if (entry.Values.ContainsKey(header))
-                    {
-                        value = entry.Values[header];
-                    }
-                    else
-                    {
-                        try
-                        {
-                            if (!fields.ContainsKey(header))
-                                fields.Add(header, entryType.GetField(header));
-
-                            value = fields[header].GetValue(entry) as string;
-                        }
-                        catch
-                        {
-                            value = " ";
-                        }
-                    }
-
-                    if (value == null)
-                        value = " ";
-
-                    if (value.Contains(","))
-                    {
-                        if (value.Contains("\""))
-                        {
-                            value = value.Replace("\"", "\\\"");
-                            value = value.Replace("\\\\\"", "\\\"");
-                        }
-
-                        value = '"' + value + '"';
-                    }
-
-                    lines.Add(value);
-                }
-            }
-
-            string manifest = string.Join("\r\n", lines);
-            return convertToCSV(manifest, headers);
-        }
-
-        static void expandBinaryRbxmFile(Instance at, string directory)
-        {
-            string name = at.Name;
-
-            if (at.IsA<Folder>() && name == "Packages")
+            if (inst.IsA<Folder>() && name == "Packages")
                 return;
 
-            if (at.IsA<LuaSourceContainer>())
+            if (inst.IsA<LuaSourceContainer>())
             {
                 string extension = "";
                 string source = "";
 
-                if (at.IsA<ModuleScript>())
+                if (inst.IsA<ModuleScript>())
                 {
-                    var module = at.Cast<ModuleScript>();
+                    var module = inst.Cast<ModuleScript>();
                     source = module.Source;
                     extension = ".lua";
                 }
-                else if (at.IsA<Script>())
+                else if (inst.IsA<Script>())
                 {
-                    var script = at.Cast<Script>();
+                    var script = inst.Cast<Script>();
 
                     if (script.IsA<LocalScript>())
                         extension = ".client.lua";
@@ -777,41 +342,41 @@ namespace RobloxClientTracker
 
                 if (source.Length > 0)
                 {
-                    string filePath = Path.Combine(directory, name + extension);
+                    string filePath = Path.Combine(parentDir, name + extension);
                     WriteFile(filePath, source, LogRbxm);
                 }
             }
-            else if (at.IsA<LocalizationTable>())
+            else if (inst.IsA<LocalizationTable>())
             {
-                var table = at.Cast<LocalizationTable>();
-                string csv = localeTableToCSV(table);
+                var table = inst.Cast<LocalizationTable>();
+                var csvTable = new CsvLocalizationTable(table);
 
-                if (csv.Length > 0)
-                {
-                    string filePath = Path.Combine(directory, name + ".csv");
-                    WriteFile(filePath, csv, LogRbxm);
-                }
+                string csv = csvTable.WriteCsv();
+                string filePath = Path.Combine(parentDir, name + ".csv");
+
+                WriteFile(filePath, csv, LogRbxm);
             }
-            else if (at.IsA<StringValue>() && name != "AvatarPartScaleType")
+            else if (inst.IsA<StringValue>() && name != "AvatarPartScaleType")
             {
-                var vString = at.Cast<StringValue>();
-                string value = vString.Value;
+                string value = inst
+                    .Cast<StringValue>()
+                    .Value;
 
                 if (value.Length > 0)
                 {
-                    string filePath = Path.Combine(directory, name + ".txt");
+                    string filePath = Path.Combine(parentDir, name + ".txt");
                     WriteFile(filePath, value, LogRbxm);
                 }
             }
 
-            var children = at
+            var children = inst
                 .GetChildren()
                 .ToList();
 
             if (children.Count > 0)
             {
-                string childDir = createDirectory(directory, name);
-                children.ForEach(child => expandBinaryRbxmFile(child, childDir));
+                string instanceDir = CreateDirectory(parentDir, name);
+                children.ForEach(child => expandBinaryRbxmFile(child, instanceDir));
             }
         }
 
@@ -832,46 +397,7 @@ namespace RobloxClientTracker
                     project.Name = info.Name.Replace(info.Extension, "");
                     expandBinaryRbxmFile(project, info.DirectoryName);
                 }
-                else
-                {
-                    Debugger.Break();
-                }
             }
-        }
-
-        static string convertToCSV(string file, params string[] headers)
-        {
-            int column = 0;
-
-            string[] lines = file.Split('\r', '\n')
-                .Where(line => line.Length > 0)
-                .ToArray();
-
-            string csv = string.Join(",", headers);
-
-            for (int i = 0; i < lines.Length; i++)
-            {
-                string line = lines[i];
-
-                if (i == 0 && line == "v0")
-                    continue;
-
-                if (column++ % headers.Length == 0)
-                    csv += '\n';
-                else
-                    csv += ',';
-
-                csv += line;
-            }
-
-            return csv;
-        }
-
-        static void convertToCSV(string path, string[] headers, Action<string> andThen)
-        {
-            string file = File.ReadAllText(path);
-            string csv = convertToCSV(file, headers);
-            andThen(csv);
         }
 
         static string permutate(string file, Func<string, string> permutation)
@@ -894,10 +420,10 @@ namespace RobloxClientTracker
         {
             // Make sure Roblox Studio is up to date for this build.
             print("Syncing Roblox Studio...", ConsoleColor.Green);
-            await studio.UpdateStudio();
+            await Studio.UpdateStudio();
 
             // Copy some metadata generated during the studio installation.
-            string studioDir = studio.GetStudioDirectory();
+            string studioDir = Studio.GetStudioDirectory();
 
             var filesToCopy = new List<string>
             {
@@ -916,7 +442,7 @@ namespace RobloxClientTracker
             foreach (string fileName in filesToCopy)
             {
                 string sourcePath = Path.Combine(studioDir, fileName);
-                string destination = Path.Combine(stageDir, fileName);
+                string destination = Path.Combine(StageDir, fileName);
 
                 if (!File.Exists(sourcePath))
                     throw new Exception($"Missing file to copy: {sourcePath}!!");
@@ -930,8 +456,8 @@ namespace RobloxClientTracker
             // Convert rbxPkgManifest.txt -> rbxPkgManifest.csv
             Task rbxPkgManifestCsv = Task.Run(() =>
             {
-                string pkgPath = Path.Combine(stageDir, "rbxPkgManifest.txt");
-                string pkgCsvPath = Path.Combine(stageDir, "rbxPkgManifest.csv");
+                string pkgPath = Path.Combine(StageDir, "rbxPkgManifest.txt");
+                string pkgCsvPath = Path.Combine(StageDir, "rbxPkgManifest.csv");
 
                 var pkgHeaders = new string[4]
                 {
@@ -941,17 +467,22 @@ namespace RobloxClientTracker
                     "Size (bytes)"
                 };
 
-                convertToCSV(pkgPath, pkgHeaders, csv => WriteFile(pkgCsvPath, csv));
+                CsvBuilder.Convert(pkgPath, pkgHeaders, csv => WriteFile(pkgCsvPath, csv));
             });
 
             // Convert rbxManifest.txt -> rbxManifest.csv
             Task rbxManifestCsv = Task.Run(() =>
             {
-                string manifestPath = Path.Combine(stageDir, "rbxManifest.txt");
-                string manifestCsvPath = Path.Combine(stageDir, "rbxManifest.csv");
-                var manifestHeaders = new string[2] { "File Name", "MD5 Signature" };
+                string manifestPath = Path.Combine(StageDir, "rbxManifest.txt");
+                string manifestCsvPath = Path.Combine(StageDir, "rbxManifest.csv");
 
-                convertToCSV(manifestPath, manifestHeaders, (csv) =>
+                var manifestHeaders = new string[2] 
+                {
+                    "File Name",
+                    "MD5 Signature"
+                };
+
+                CsvBuilder.Convert(manifestPath, manifestHeaders, (csv) =>
                 {
                     string manifestCsv = permutate(csv, flipColumns);
                     WriteFile(manifestCsvPath, manifestCsv);
@@ -967,11 +498,11 @@ namespace RobloxClientTracker
 
             var minerActions = new List<Action>
             {
-                scanFastFlags,
-                updateApiDump,
-                extractShaderData,
-                extractQtResources,
-                extractStudioStrings
+                ApiDump.Extract,
+                FastFlags.Extract,
+                ShaderData.Extract,
+                QtResources.Extract,
+                StudioStrings.Extract
             };
 
             foreach (Action minerAction in minerActions)
@@ -1005,7 +536,7 @@ namespace RobloxClientTracker
                 Task unpack = Task.Run(() =>
                 {
                     string srcFolder = Path.Combine(studioDir, srcPath);
-                    string destFolder = resetDirectory(stageDir, destPath);
+                    string destFolder = ResetDirectory(StageDir, destPath);
 
                     print($"\tCopying {srcFolder} to {destFolder}", CYAN);
                     copyDirectory(srcFolder, destFolder);
@@ -1061,7 +592,7 @@ namespace RobloxClientTracker
             {
                 try
                 {
-                    string filePath = stageDir + '\\' + file;
+                    string filePath = StageDir + '\\' + file;
                     FileInfo fileInfo = new FileInfo(filePath);
 
                     if (boringFiles.Contains(fileInfo.Name) || fileInfo.Extension.Contains("rbx"))
@@ -1104,7 +635,7 @@ namespace RobloxClientTracker
 
         static bool initGitBinding(string repository)
         {
-            string gitBinding = Path.Combine(stageDir, ".git");
+            string gitBinding = Path.Combine(StageDir, ".git");
 
             if (!Directory.Exists(gitBinding))
             {
@@ -1134,7 +665,7 @@ namespace RobloxClientTracker
                 string sshCommand = $"ssh -i {privateKey}";
                 string repoUrl = $"git@github.com:{owner}/{repository}.git";
 
-                git($"clone -c core.sshCommand=\"{sshCommand}\" {repoUrl} {stageDir}");
+                git($"clone -c core.sshCommand=\"{sshCommand}\" {repoUrl} {StageDir}");
 
                 string name = settings.BotName;
                 git("config", "--local", "user.name", '"' + name + '"');
@@ -1227,7 +758,7 @@ namespace RobloxClientTracker
 
                             result.Append("\r\n}");
 
-                            string filePath = Path.Combine(stageDir, platform + ".json");
+                            string filePath = Path.Combine(StageDir, platform + ".json");
                             string newFile = result.ToString();
                             string oldFile = "";
 
@@ -1275,8 +806,8 @@ namespace RobloxClientTracker
                 }
             }
 
-            studio = new StudioBootstrapper(branch);
-            studioPath = studio.GetStudioPath();
+            Studio = new StudioBootstrapper(branch);
+            StudioPath = Studio.GetStudioPath();
 
             print("Main thread starting!", MAGENTA);
 
@@ -1422,8 +953,8 @@ namespace RobloxClientTracker
             RootRegistry = Registry.CurrentUser.Open("Software", "RobloxClientTracker");
             BranchRegistry = RootRegistry.Open(branch);
 
-            trunk = createDirectory(@"C:\Roblox-Client-Tracker");
-            stageDir = createDirectory(trunk, "stage", branch);
+            Trunk = CreateDirectory(@"C:\Roblox-Client-Tracker");
+            StageDir = CreateDirectory(Trunk, "stage", branch);
 
             ServicePointManager.SecurityProtocol = SecurityProtocolType.Tls | SecurityProtocolType.Tls11 | SecurityProtocolType.Tls12 | SecurityProtocolType.Ssl3;
             Task mainThread = null;
