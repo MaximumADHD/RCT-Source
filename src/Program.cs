@@ -1181,8 +1181,6 @@ namespace RobloxClientTracker
 
                 foreach (string platform in platforms)
                 {
-                    print($"\tUpdating platform {platform}...");
-
                     Task updatePlatform = Task.Run(async () =>
                     {
                         string json = "";
@@ -1230,7 +1228,17 @@ namespace RobloxClientTracker
                             result.Append("\r\n}");
 
                             string filePath = Path.Combine(stageDir, platform + ".json");
-                            File.WriteAllText(filePath, result.ToString());
+                            string newFile = result.ToString();
+                            string oldFile = "";
+
+                            if (File.Exists(filePath))
+                                oldFile = File.ReadAllText(filePath);
+
+                            if (oldFile != newFile)
+                            {
+                                print($"\tUpdating {platform}.json ...", YELLOW);
+                                File.WriteAllText(filePath, newFile);
+                            }
                         }
                     });
 
