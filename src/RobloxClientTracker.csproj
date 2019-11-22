@@ -61,17 +61,16 @@
     <Win32Resource>Icons.res</Win32Resource>
   </PropertyGroup>
   <ItemGroup>
-    <Reference Include="LZ4">
-      <HintPath>Include\LZ4.dll</HintPath>
-    </Reference>
     <Reference Include="Newtonsoft.Json, Version=12.0.0.0, Culture=neutral, PublicKeyToken=30ad4fe6b2a6aeed, processorArchitecture=MSIL">
       <HintPath>..\packages\Newtonsoft.Json.12.0.2\lib\net45\Newtonsoft.Json.dll</HintPath>
       <Private>True</Private>
     </Reference>
-    <Reference Include="RobloxAPIDumpTool">
+    <Reference Include="RobloxAPIDumpTool, Version=2.0.1.0, Culture=neutral, processorArchitecture=MSIL">
+      <SpecificVersion>False</SpecificVersion>
       <HintPath>Include\RobloxAPIDumpTool.dll</HintPath>
     </Reference>
-    <Reference Include="RobloxFileFormat">
+    <Reference Include="RobloxFileFormat, Version=1.0.0.0, Culture=neutral, processorArchitecture=MSIL">
+      <SpecificVersion>False</SpecificVersion>
       <HintPath>Include\RobloxFileFormat.dll</HintPath>
     </Reference>
     <Reference Include="System" />
@@ -92,6 +91,8 @@
     <Compile Include="Miners\FastFlags.cs" />
     <Compile Include="Miners\QtResources.cs" />
     <Compile Include="Miners\ShaderData.cs" />
+    <Compile Include="Models\ModelHasher.cs" />
+    <Compile Include="Models\ModelUnpacker.cs" />
     <Compile Include="Shaders\ShaderFile.cs" />
     <Compile Include="Miners\StudioStrings.cs" />
     <Compile Include="Studio\FileManifest.cs" />

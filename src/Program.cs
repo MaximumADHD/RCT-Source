@@ -8,8 +8,6 @@ using System.Text;
 using System.Threading.Tasks;
 using System.Text.RegularExpressions;
 
-using RobloxFiles;
-
 using Microsoft.Win32;
 using RobloxClientTracker.Properties;
 
@@ -97,12 +95,6 @@ namespace RobloxClientTracker
             RedirectStandardOutput = true,
         };
 
-        public static readonly FileLogConfig LogRbxm = new FileLogConfig()
-        {
-            Color = DARK_CYAN,
-            Stack = 3
-        };
-
         public static void print(string message, ConsoleColor color = GRAY)
         {
             Console.ForegroundColor = color;
@@ -123,7 +115,7 @@ namespace RobloxClientTracker
             return globalPath.Substring(StageDir.Length + 1);
         }
 
-        static string sanitizeString(string str)
+        public static string SanitizeString(string str)
         {
             string sanitized = str
                 .Replace("\r\r", "\r")
@@ -135,7 +127,7 @@ namespace RobloxClientTracker
 
         public static void WriteFile(string path, string contents, FileLogConfig? maybeConfig = null)
         {
-            string sanitized = sanitizeString(contents);
+            string sanitized = SanitizeString(contents);
             
             if (maybeConfig.HasValue)
             {
@@ -291,13 +283,13 @@ namespace RobloxClientTracker
 
         static void copyDirectory(string source, string target)
         {
-            string dest = ResetDirectory(target);
+            string dest = CreateDirectory(target);
             DirectoryInfo src = new DirectoryInfo(source);
 
             foreach (var file in src.GetFiles())
             {
                 string destPath = Path.Combine(dest, file.Name);
-                file.CopyTo(destPath);
+                file.CopyTo(destPath, true);
             }
 
             foreach (var subDir in src.GetDirectories())
@@ -308,98 +300,6 @@ namespace RobloxClientTracker
             }
         }
         
-        static void expandBinaryRbxmFile(Instance inst, string parentDir)
-        {
-            string name = inst.Name;
-
-            if (inst.IsA<Folder>() && name == "Packages")
-                return;
-
-            if (inst.IsA<LuaSourceContainer>())
-            {
-                string extension = "";
-                string source = "";
-
-                if (inst.IsA<ModuleScript>())
-                {
-                    var module = inst.Cast<ModuleScript>();
-                    source = module.Source;
-                    extension = ".lua";
-                }
-                else if (inst.IsA<Script>())
-                {
-                    var script = inst.Cast<Script>();
-
-                    if (script.IsA<LocalScript>())
-                        extension = ".client.lua";
-                    else
-                        extension = ".server.lua";
-
-                    source = script.Source;
-                }
-
-                source = sanitizeString(source);
-
-                if (source.Length > 0)
-                {
-                    string filePath = Path.Combine(parentDir, name + extension);
-                    WriteFile(filePath, source, LogRbxm);
-                }
-            }
-            else if (inst.IsA<LocalizationTable>())
-            {
-                var table = inst.Cast<LocalizationTable>();
-                var csvTable = new CsvLocalizationTable(table);
-
-                string csv = csvTable.WriteCsv();
-                string filePath = Path.Combine(parentDir, name + ".csv");
-
-                WriteFile(filePath, csv, LogRbxm);
-            }
-            else if (inst.IsA<StringValue>() && name != "AvatarPartScaleType")
-            {
-                string value = inst
-                    .Cast<StringValue>()
-                    .Value;
-
-                if (value.Length > 0)
-                {
-                    string filePath = Path.Combine(parentDir, name + ".txt");
-                    WriteFile(filePath, value, LogRbxm);
-                }
-            }
-
-            var children = inst
-                .GetChildren()
-                .ToList();
-
-            if (children.Count > 0)
-            {
-                string instanceDir = CreateDirectory(parentDir, name);
-                children.ForEach(child => expandBinaryRbxmFile(child, instanceDir));
-            }
-        }
-
-        static void expandBinaryRbxmFile(string filePath)
-        {
-            FileInfo info = new FileInfo(filePath);
-
-            if (info.Exists && (info.Extension == ".rbxm" || info.Extension == ".rbxmx"))
-            {
-                RobloxFile file = RobloxFile.Open(filePath);
-                Instance[] children = file.GetChildren();
-
-                File.Delete(filePath);
-
-                if (children.Length == 1)
-                {
-                    Instance project = children[0];
-                    project.Name = info.Name.Replace(info.Extension, "");
-                    expandBinaryRbxmFile(project, info.DirectoryName);
-                }
-            }
-        }
-
         static string permutate(string file, Func<string, string> permutation)
         {
             string[] lines = file.Split('\r', '\n')
@@ -510,33 +410,59 @@ namespace RobloxClientTracker
                 Task minerTask = Task.Run(minerAction);
                 taskPool.Add(minerTask);
             }
-            
-            // Unpack and transfer specific content data from the studio build.
-            print("Unpacking content data...", CYAN);
-            
-            var contentFolders = new Dictionary<string, string>
+
+            // Unpack plugin files
+            var pluginFolders = new List<string>
             {
-                { "BuiltInPlugins", "" },
-                { "BuiltInStandalonePlugins", "" },
-
-                { "avatar", @"content\avatar" },
-                { "scripts", @"content\scripts" },
-
-                { "LuaPackages", @"content\LuaPackages" },
-                { "translations", @"content\translations" }
+                "BuiltInPlugins",
+                "BuiltInStandalonePlugins"
             };
 
-            foreach (string destPath in contentFolders.Keys)
+            foreach (string folderName in pluginFolders)
             {
-                string srcPath = contentFolders[destPath];
-
-                if (srcPath == "")
-                    srcPath = destPath;
-                
                 Task unpack = Task.Run(() =>
                 {
-                    string srcFolder = Path.Combine(studioDir, srcPath);
-                    string destFolder = ResetDirectory(StageDir, destPath);
+                    string srcFolder = Path.Combine(studioDir, folderName);
+                    string destFolder = Path.Combine(StageDir, folderName);
+
+                    print($"\tCopying {srcFolder} to {destFolder}", CYAN);
+                    copyDirectory(srcFolder, destFolder);
+
+                    foreach (string file in Directory.GetFiles(destFolder))
+                    {
+                        if (file.EndsWith(".rbxm") || file.EndsWith(".rbxmx"))
+                        {
+                            print($"\t\tUnpacking {localPath(file)}", CYAN);
+                            ModelUnpacker.UnpackFile(file, true);
+
+                            continue;
+                        }
+                        
+                        File.Delete(file);
+                    }
+                });
+
+                taskPool.Add(unpack);
+            }
+
+            // Unpack and transfer content folders.
+            print("Unpacking content data...", CYAN);
+            
+            var contentFolders = new List<string>
+            {
+                "avatar",
+                "scripts",
+
+                "LuaPackages",
+                "translations"
+            };
+
+            foreach (string folderName in contentFolders)
+            {
+                Task unpack = Task.Run(() =>
+                {
+                    string srcFolder = Path.Combine(studioDir, "content", folderName);
+                    string destFolder = ResetDirectory(StageDir, folderName);
 
                     print($"\tCopying {srcFolder} to {destFolder}", CYAN);
                     copyDirectory(srcFolder, destFolder);
@@ -546,7 +472,7 @@ namespace RobloxClientTracker
                         if (file.EndsWith(".rbxm") || file.EndsWith(".rbxmx"))
                         {
                             print($"\t\tUnpacking {localPath(file)}", CYAN);
-                            expandBinaryRbxmFile(file);
+                            ModelUnpacker.UnpackFile(file, false);
                         }
                         else if (file.EndsWith(".sig") || file.EndsWith(".mesh"))
                         {
@@ -555,7 +481,7 @@ namespace RobloxClientTracker
                         else if (file.EndsWith(".lua"))
                         {
                             string source = File.ReadAllText(file);
-                            string newSource = sanitizeString(source);
+                            string newSource = SanitizeString(source);
 
                             if (source != newSource)
                             {
