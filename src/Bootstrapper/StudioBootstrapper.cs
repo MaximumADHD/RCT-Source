@@ -211,6 +211,8 @@ namespace RobloxClientTracker
         {
             string binaryType = GetStudioBinaryType();
 
+            if (branch == "roblox")
+                return await ClientVersionInfo.Get(binaryType);
 
             if (fastGuid == "")
                 fastGuid = await GetFastVersionGuid(branch);
