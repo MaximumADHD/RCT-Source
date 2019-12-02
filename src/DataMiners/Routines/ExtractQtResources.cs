@@ -8,8 +8,10 @@ using RobloxClientTracker.Properties;
 
 namespace RobloxClientTracker
 {
-    public static class QtResources
+    public class ExtractQtResources : DataMiner
     {
+        public override ConsoleColor LogColor => ConsoleColor.Magenta;
+
         private static Dictionary<string, byte[]> luaFiles = new Dictionary<string, byte[]>
         {
             { "QtExtract.lua",     Resources.QtExtract_lua    },
@@ -18,15 +20,10 @@ namespace RobloxClientTracker
             { "Deflate.lua",       Resources.Deflate_lua      },
             { "Bit.lua",           Resources.Bit_lua          },
         };
-
-        private static void print(string msg)
+        
+        private void deployLuaJit(string dir)
         {
-            Program.print(msg, Program.MAGENTA);
-        }
-
-        private static void deployLuaJit(string dir)
-        {
-            Program.ResetDirectory(dir);
+            resetDirectory(dir);
 
             using (var stream = new MemoryStream(Resources.LuaJIT_zip))
             {
@@ -55,14 +52,9 @@ namespace RobloxClientTracker
             }
         }
 
-        public static void Extract()
+        public override void ExecuteRoutine()
         {
-            string studioPath = Program.StudioPath;
-
-            string stageDir = Program.StageDir;
-            string extractDir = Program.ResetDirectory(stageDir, "QtResources");
-
-            string trunk = Program.Trunk;
+            string extractDir = resetDirectory(stageDir, "QtResources");
             string luaDir = Path.Combine(trunk, "lua");
 
             string luaJit = Path.Combine(luaDir, "luajit.cmd");
@@ -74,7 +66,7 @@ namespace RobloxClientTracker
                 deployLuaJit(luaDir);
             }
 
-            ProcessStartInfo extract = new ProcessStartInfo()
+            var extract = new ProcessStartInfo()
             {
                 FileName = luaJit,
                 Arguments = $"{qtExtract} {studioPath} --chunk 1 --output {extractDir}",

@@ -36,7 +36,7 @@ namespace RobloxClientTracker
                 string value = "";
                 string extension = "";
 
-                if (ModelUnpacker.GetInstanceInfo(inst, ref value, ref extension))
+                if (RobloxFileMiner.PullInstanceData(inst, ref value, ref extension))
                 {
                     string path = inst.GetFullName("\\");
 

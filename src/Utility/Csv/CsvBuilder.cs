@@ -7,9 +7,10 @@ namespace RobloxClientTracker
 {
     public static class CsvBuilder
     {
-        public static string Convert(string file, params string[] headers)
+        public static string Convert(string file, IEnumerable<string> headers)
         {
             int column = 0;
+            int numColumns = headers.Count();
 
             string[] lines = file.Split('\r', '\n')
                 .Where(line => line.Length > 0)
@@ -24,7 +25,7 @@ namespace RobloxClientTracker
                 if (i == 0 && line == "v0")
                     continue;
 
-                if (column++ % headers.Length == 0)
+                if (column++ % numColumns == 0)
                     csv += '\n';
                 else
                     csv += ',';
@@ -33,6 +34,11 @@ namespace RobloxClientTracker
             }
 
             return csv;
+        }
+
+        public static string Convert(string file, params string[] headers)
+        {
+            return Convert(file, headers.AsEnumerable());
         }
 
         public static void Convert(string path, string[] headers, Action<string> callback)

@@ -107,21 +107,27 @@
     <Reference Include="System.Xml" />
   </ItemGroup>
   <ItemGroup>
-    <Compile Include="Miners\ApiDump.cs" />
-    <Compile Include="Miners\FastFlags.cs" />
-    <Compile Include="Miners\QtResources.cs" />
-    <Compile Include="Miners\ShaderData.cs" />
-    <Compile Include="Models\ModelHasher.cs" />
-    <Compile Include="Models\ModelUnpacker.cs" />
-    <Compile Include="Shaders\ShaderFile.cs" />
-    <Compile Include="Miners\StudioStrings.cs" />
-    <Compile Include="Studio\FileManifest.cs" />
-    <Compile Include="Studio\PackageManifest.cs" />
-    <Compile Include="Studio\History\ClientVersionInfo.cs" />
-    <Compile Include="Studio\History\DeployLog.cs" />
-    <Compile Include="Studio\History\HistoryCache.cs" />
-    <Compile Include="Studio\History\StudioDeployLogs.cs" />
-    <Compile Include="Studio\StudioBootstrapper.cs" />
+    <Compile Include="DataMiners\MultiTaskMiner.cs" />
+    <Compile Include="DataMiners\Routines\CopyContentFolders.cs" />
+    <Compile Include="DataMiners\Routines\UnpackPlugins.cs" />
+    <Compile Include="DataMiners\Routines\GenerateApiDump.cs" />
+    <Compile Include="DataMiners\Routines\ScanFastFlags.cs" />
+    <Compile Include="DataMiners\DataMiner.cs" />
+    <Compile Include="DataMiners\Routines\ConvertManifestsToCsv.cs" />
+    <Compile Include="DataMiners\Routines\ExtractQtResources.cs" />
+    <Compile Include="DataMiners\Routines\UnpackShaders.cs" />
+    <Compile Include="Utility\FileLogConfig.cs" />
+    <Compile Include="Utility\ModelHasher.cs" />
+    <Compile Include="DataMiners\RobloxFileMiner.cs" />
+    <Compile Include="Utility\Shaders\ShaderFile.cs" />
+    <Compile Include="DataMiners\Routines\ExtractStudioStrings.cs" />
+    <Compile Include="Bootstrapper\FileManifest.cs" />
+    <Compile Include="Bootstrapper\PackageManifest.cs" />
+    <Compile Include="Bootstrapper\History\ClientVersionInfo.cs" />
+    <Compile Include="Bootstrapper\History\DeployLog.cs" />
+    <Compile Include="Bootstrapper\History\HistoryCache.cs" />
+    <Compile Include="Bootstrapper\History\StudioDeployLogs.cs" />
+    <Compile Include="Bootstrapper\StudioBootstrapper.cs" />
     <Compile Include="Properties\Settings.Designer.cs">
       <AutoGen>True</AutoGen>
       <DesignTimeSharedInput>True</DesignTimeSharedInput>
@@ -132,14 +138,13 @@
       <DesignTime>True</DesignTime>
       <DependentUpon>Resources.resx</DependentUpon>
     </Compile>
-    <Compile Include="Csv\CsvBuilder.cs" />
-    <Compile Include="Csv\CsvLocalizationTable.cs" />
+    <Compile Include="Utility\Csv\CsvBuilder.cs" />
+    <Compile Include="Utility\Csv\CsvLocalizationTable.cs" />
     <Compile Include="Program.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
-    <Compile Include="Utility\FileLogConfig.cs" />
     <Compile Include="Utility\NameTree.cs" />
     <Compile Include="Utility\Extensions.cs" />
-    <Compile Include="Shaders\ShaderPack.cs" />
+    <Compile Include="Utility\Shaders\ShaderPack.cs" />
     <Compile Include="Utility\SystemEvent.cs" />
   </ItemGroup>
   <ItemGroup>

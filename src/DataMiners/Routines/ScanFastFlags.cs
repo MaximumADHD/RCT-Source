@@ -9,25 +9,23 @@ using Newtonsoft.Json.Linq;
 
 namespace RobloxClientTracker
 {
-    public static class FastFlags
+    public class ScanFastFlags : DataMiner
     {
-        private static void print(string msg)
-        {
-            Program.print(msg, Program.YELLOW);
-        }
+        private const string SHOW_EVENT = "StudioNoSplashScreen";
+        private const string START_EVENT = "ClientTrackerFlagScan";
 
-        public static void Extract()
-        {
-            string studioPath = Program.StudioPath;
+        public override ConsoleColor LogColor => ConsoleColor.Yellow;
 
+        public override void ExecuteRoutine()
+        {
             string localAppData = Environment.GetEnvironmentVariable("LocalAppData");
-            string clientSettings = Program.ResetDirectory(localAppData, "Roblox", "ClientSettings");
+            string clientSettings = resetDirectory(localAppData, "Roblox", "ClientSettings");
 
             string settingsPath = Path.Combine(clientSettings, "StudioAppSettings.json");
             File.WriteAllText(settingsPath, "");
 
-            SystemEvent show = new SystemEvent("StudioNoSplashScreen");
-            SystemEvent start = new SystemEvent("ClientTrackerFlagScan");
+            var show = new SystemEvent(SHOW_EVENT);
+            var start = new SystemEvent(START_EVENT);
 
             print("Starting FFlag scan...");
 
@@ -67,8 +65,8 @@ namespace RobloxClientTracker
 
             using (var jsonText = new StringReader(file))
             {
-                JsonTextReader reader = new JsonTextReader(jsonText);
-                JObject flagData = JObject.Load(reader);
+                var reader = new JsonTextReader(jsonText);
+                var flagData = JObject.Load(reader);
 
                 foreach (var pair in flagData)
                 {
@@ -80,11 +78,10 @@ namespace RobloxClientTracker
             flags.Sort();
             print("Flag Scan completed!");
 
-            string stageDir = Program.StageDir;
             string flagsPath = Path.Combine(stageDir, "FVariables.txt");
-
             string result = string.Join("\r\n", flags);
-            Program.WriteFile(flagsPath, result);
+
+            writeFile(flagsPath, result);
         }
     }
 }

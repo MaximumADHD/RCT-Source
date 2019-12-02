@@ -56,7 +56,7 @@ namespace RobloxClientTracker
             return result;
         }
 
-        public void WriteFile(string dir, RegistryKey container, FileLogConfig logConfig)
+        public void WriteFile(UnpackShaders unpacker, string dir, RegistryKey container)
         {
             string contents = Program.UTF8.GetString(Buffer);
 
@@ -69,8 +69,8 @@ namespace RobloxClientTracker
                     .ToLower();
 
                 string shaderPath = Path.Combine(dir, Name + '.' + extension);
-
                 var names = new List<int>();
+
                 Regex variables = new Regex("_([0-9]+)");
 
                 foreach (var match in variables.Matches(contents))
@@ -94,7 +94,7 @@ namespace RobloxClientTracker
                 if (currentHash != Hash)
                 {
                     container.SetValue(RegistryKey, Hash);
-                    Program.WriteFile(shaderPath, contents, logConfig);
+                    unpacker.WriteShader(shaderPath, contents);
                 }
             }
         }

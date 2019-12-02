@@ -1,13 +1,17 @@
-﻿using System.IO;
+﻿using System;
+using System.IO;
+
 using Roblox.Reflection;
 
 namespace RobloxClientTracker
 {
-    public static class ApiDump
+    public class GenerateApiDump : DataMiner
     {
-        public static void Extract()
+        public override ConsoleColor LogColor => ConsoleColor.Cyan;
+
+        public override void ExecuteRoutine()
         {
-            string stageDir = Program.StageDir;
+            print("Generating API Dump...");
 
             string jsonFile = Path.Combine(stageDir, "API-Dump.json");
             string json = File.ReadAllText(jsonFile);
@@ -18,7 +22,7 @@ namespace RobloxClientTracker
             string dump = dumper.DumpApi(ReflectionDumper.DumpUsingTxt);
             string exportPath = Path.Combine(stageDir, "API-Dump.txt");
 
-            Program.WriteFile(exportPath, dump);
+            writeFile(exportPath, dump);
         }
     }
 }

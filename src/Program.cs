@@ -58,34 +58,66 @@ namespace RobloxClientTracker
 
         static int UPDATE_FREQUENCY = 5;
         static bool VERBOSE_GIT_LOGS = false;
+
         static TrackMode TRACK_MODE = TrackMode.Client;
+        static readonly Type DataMiner = typeof(DataMiner);
 
         public static string FORCE_VERSION_GUID = "";
         public static string FORCE_VERSION_ID = "";
+
+        static string[] fflagPlatforms = new string[]
+        {
+            "PCDesktopClient",
+            "MacDesktopClient",
+            "PCStudioBootstrapper",
+            "MacStudioBootstrapper",
+            "PCClientBootstrapper",
+            "MacClientBootstrapper",
+            "XboxClient",
+            "AndroidApp",
+            "iOSApp",
+            "StudioApp"
+        };
 
         static List<string> boringFiles = new List<string>()
         {
             "rbxManifest.txt",
             "rbxPkgManifest.txt",
+
             "rbxManifest.csv",
             "rbxPkgManifest.csv",
+
             "version.txt",
             "version-guid.txt",
+
             "FVariables.txt",
             "DeepStrings.txt",
         };
 
-        static string branch = "roblox";
-        static string parent = "roblox";
+        static List<string> filesToCopy = new List<string>
+        {
+            "version.txt",
+            "version-guid.txt",
 
-        public static string Trunk;
-        public static string StageDir;
+            "API-Dump.json",
 
-        public static string StudioPath;
-        public static StudioBootstrapper Studio;
+            "rbxManifest.txt",
+            "rbxPkgManifest.txt",
 
-        static Dictionary<string, string> argMap = new Dictionary<string, string>();
-        
+            "ReflectionMetadata.xml",
+            "RobloxStudioRibbon.xml"
+        };
+
+        static Dictionary<string, ConsoleColor> changeTypeColors = new Dictionary<string, ConsoleColor>()
+        {
+            { "A", GREEN   },
+            { "D", RED     },
+            { "R", MAGENTA },
+            { "C", CYAN    },
+            { "M", YELLOW  },
+            { "U", GRAY    },
+        };
+
         static readonly ProcessStartInfo gitExecute = new ProcessStartInfo
         {
             FileName = "git",
@@ -94,6 +126,18 @@ namespace RobloxClientTracker
             RedirectStandardError = true,
             RedirectStandardOutput = true,
         };
+
+        static string branch = "roblox";
+        static string parent = "roblox";
+
+        public static string trunk { get; private set; }
+        public static string stageDir { get; private set; }
+
+        public static string studioPath { get; private set; }
+        public static StudioBootstrapper studio { get; private set; }
+
+        static Dictionary<string, string> argMap = new Dictionary<string, string>();
+        const string fflagEndpoint = "https://clientsettingscdn.roblox.com/v1/settings/application?applicationName=";
 
         public static void print(string message, ConsoleColor color = GRAY)
         {
@@ -110,41 +154,19 @@ namespace RobloxClientTracker
             }
         }
 
-        public static string localPath(string globalPath)
+        public static string createDirectory(params string[] traversal)
         {
-            return globalPath.Substring(StageDir.Length + 1);
-        }
+            string dir = Path.Combine(traversal);
 
-        public static string SanitizeString(string str)
-        {
-            string sanitized = str
-                .Replace("\r\r", "\r")
-                .Replace("\n", "\r\n")
-                .Replace("\r\r", "\r");
+            if (!Directory.Exists(dir))
+                Directory.CreateDirectory(dir);
 
-            return sanitized;
-        }
-
-        public static void WriteFile(string path, string contents, FileLogConfig? maybeConfig = null)
-        {
-            string sanitized = SanitizeString(contents);
-            
-            if (maybeConfig.HasValue)
-            {
-                FileLogConfig config = maybeConfig.Value;
-
-                for (int i = 0; i < config.Stack; i++)
-                    Console.Write('\t');
-
-                print($"Writing file: {localPath(path)}", config.Color);
-            }
-            
-            File.WriteAllText(path, sanitized, UTF8);
+            return dir;
         }
 
         public static IEnumerable<string> git(params string[] args)
         {
-            Directory.SetCurrentDirectory(StageDir);
+            Directory.SetCurrentDirectory(stageDir);
 
             string command = string.Join(" ", args);
             Process git;
@@ -214,32 +236,16 @@ namespace RobloxClientTracker
 
                 log("\t\t");
 
-                switch (type)
+                if (changeTypeColors.ContainsKey(type))
                 {
-                    case "A":
-                        log(type, GREEN);
-                        break;
-                    case "D":
-                        log(type, RED);
-                        break;
-                    case "R":
-                        log(type, MAGENTA);
-                        break;
-                    case "C":
-                        log(type, CYAN);
-                        break;
-                    case "M":
-                        log(type, YELLOW);
-                        break;
-                    case "U":
-                        log(type, GRAY);
-                        break;
-                    default:
-                        log("?", BLUE);
-                        break;
-                    //
+                    ConsoleColor color = changeTypeColors[type];
+                    log(type, color);
                 }
-
+                else
+                {
+                    log("?", BLUE);
+                }
+                
                 print($" {file}", WHITE);
                 result.Add(file);
             }
@@ -260,249 +266,7 @@ namespace RobloxClientTracker
 
             return (behind > 0);
         }
-
-        public static string CreateDirectory(params string[] traversal)
-        {
-            string dir = Path.Combine(traversal);
-
-            if (!Directory.Exists(dir))
-                Directory.CreateDirectory(dir);
-
-            return dir;
-        }
-
-        public static string ResetDirectory(params string[] traversal)
-        {
-            string dir = Path.Combine(traversal);
-
-            if (Directory.Exists(dir))
-                Directory.Delete(dir, true);
-
-            return CreateDirectory(dir);
-        }
-
-        static void copyDirectory(string source, string target)
-        {
-            string dest = CreateDirectory(target);
-            DirectoryInfo src = new DirectoryInfo(source);
-
-            foreach (var file in src.GetFiles())
-            {
-                string destPath = Path.Combine(dest, file.Name);
-                file.CopyTo(destPath, true);
-            }
-
-            foreach (var subDir in src.GetDirectories())
-            {
-                string subSrc = subDir.FullName;
-                string subTarget = Path.Combine(dest, subDir.Name);
-                copyDirectory(subSrc, subTarget);
-            }
-        }
         
-        static string permutate(string file, Func<string, string> permutation)
-        {
-            string[] lines = file.Split('\r', '\n')
-                .Where(line => line.Length > 0)
-                .Select(line => permutation(line))
-                .ToArray();
-
-            return string.Join("\n", lines);
-        }
-
-        static string flipColumns(string line)
-        {
-            string[] pair = line.Split(',');
-            return pair[1] + ',' + pair[0];
-        }
-
-        static async Task<bool> updateStage(ClientVersionInfo info)
-        {
-            // Make sure Roblox Studio is up to date for this build.
-            print("Syncing Roblox Studio...", ConsoleColor.Green);
-            await Studio.UpdateStudio();
-
-            // Copy some metadata generated during the studio installation.
-            string studioDir = Studio.GetStudioDirectory();
-
-            var filesToCopy = new List<string>
-            {
-                "version.txt",
-                "version-guid.txt",
-
-                "API-Dump.json",
-
-                "rbxManifest.txt",
-                "rbxPkgManifest.txt",
-
-                "ReflectionMetadata.xml",
-                "RobloxStudioRibbon.xml"
-            };
-
-            foreach (string fileName in filesToCopy)
-            {
-                string sourcePath = Path.Combine(studioDir, fileName);
-                string destination = Path.Combine(StageDir, fileName);
-
-                if (!File.Exists(sourcePath))
-                    throw new Exception($"Missing file to copy: {sourcePath}!!");
-
-                if (File.Exists(destination))
-                    File.Delete(destination);
-
-                File.Copy(sourcePath, destination);
-            }
-
-            // Convert rbxPkgManifest.txt -> rbxPkgManifest.csv
-            Task rbxPkgManifestCsv = Task.Run(() =>
-            {
-                string pkgPath = Path.Combine(StageDir, "rbxPkgManifest.txt");
-                string pkgCsvPath = Path.Combine(StageDir, "rbxPkgManifest.csv");
-
-                var pkgHeaders = new string[4]
-                {
-                    "File Name",
-                    "MD5 Signature",
-                    "Compressed Size (bytes)",
-                    "Size (bytes)"
-                };
-
-                CsvBuilder.Convert(pkgPath, pkgHeaders, csv => WriteFile(pkgCsvPath, csv));
-            });
-
-            // Convert rbxManifest.txt -> rbxManifest.csv
-            Task rbxManifestCsv = Task.Run(() =>
-            {
-                string manifestPath = Path.Combine(StageDir, "rbxManifest.txt");
-                string manifestCsvPath = Path.Combine(StageDir, "rbxManifest.csv");
-
-                var manifestHeaders = new string[2] 
-                {
-                    "File Name",
-                    "MD5 Signature"
-                };
-
-                CsvBuilder.Convert(manifestPath, manifestHeaders, (csv) =>
-                {
-                    string manifestCsv = permutate(csv, flipColumns);
-                    WriteFile(manifestCsvPath, manifestCsv);
-                });
-            });
-
-            // Run some other data mining tasks in parallel so they don't block each other.
-            var taskPool = new List<Task>()
-            {
-                rbxPkgManifestCsv,
-                rbxManifestCsv
-            };
-
-            var minerActions = new List<Action>
-            {
-                ApiDump.Extract,
-                FastFlags.Extract,
-                ShaderData.Extract,
-                QtResources.Extract,
-                StudioStrings.Extract
-            };
-
-            foreach (Action minerAction in minerActions)
-            {
-                Task minerTask = Task.Run(minerAction);
-                taskPool.Add(minerTask);
-            }
-
-            // Unpack plugin files
-            var pluginFolders = new List<string>
-            {
-                "BuiltInPlugins",
-                "BuiltInStandalonePlugins"
-            };
-
-            foreach (string folderName in pluginFolders)
-            {
-                Task unpack = Task.Run(() =>
-                {
-                    string srcFolder = Path.Combine(studioDir, folderName);
-                    string destFolder = Path.Combine(StageDir, folderName);
-
-                    print($"\tCopying {srcFolder} to {destFolder}", CYAN);
-                    copyDirectory(srcFolder, destFolder);
-
-                    foreach (string file in Directory.GetFiles(destFolder))
-                    {
-                        if (file.EndsWith(".rbxm") || file.EndsWith(".rbxmx"))
-                        {
-                            print($"\t\tUnpacking {localPath(file)}", CYAN);
-                            ModelUnpacker.UnpackFile(file, true);
-
-                            continue;
-                        }
-                        
-                        File.Delete(file);
-                    }
-                });
-
-                taskPool.Add(unpack);
-            }
-
-            // Unpack and transfer content folders.
-            print("Unpacking content data...", CYAN);
-            
-            var contentFolders = new List<string>
-            {
-                "avatar",
-                "scripts",
-
-                "LuaPackages",
-                "translations"
-            };
-
-            foreach (string folderName in contentFolders)
-            {
-                Task unpack = Task.Run(() =>
-                {
-                    string srcFolder = Path.Combine(studioDir, "content", folderName);
-                    string destFolder = ResetDirectory(StageDir, folderName);
-
-                    print($"\tCopying {srcFolder} to {destFolder}", CYAN);
-                    copyDirectory(srcFolder, destFolder);
-
-                    foreach (string file in Directory.GetFiles(destFolder, "*.*", SearchOption.AllDirectories))
-                    {
-                        if (file.EndsWith(".rbxm") || file.EndsWith(".rbxmx"))
-                        {
-                            print($"\t\tUnpacking {localPath(file)}", CYAN);
-                            ModelUnpacker.UnpackFile(file, false);
-                        }
-                        else if (file.EndsWith(".sig") || file.EndsWith(".mesh"))
-                        {
-                            File.Delete(file);
-                        }
-                        else if (file.EndsWith(".lua"))
-                        {
-                            string source = File.ReadAllText(file);
-                            string newSource = SanitizeString(source);
-
-                            if (source != newSource)
-                            {
-                                WriteFile(file, newSource);
-                            }
-                        }
-                    }
-                });
-
-                taskPool.Add(unpack);
-            }
-
-            await Task.WhenAll(taskPool);
-
-            foreach (Task task in taskPool)
-                if (task.Status == TaskStatus.Faulted)
-                    throw task.Exception;
-
-            return true;
-        }
-
         static bool pushCommit(string label, string filter = ".")
         {
             print($"\t[{label}] Checking in files...", YELLOW);
@@ -518,7 +282,7 @@ namespace RobloxClientTracker
             {
                 try
                 {
-                    string filePath = StageDir + '\\' + file;
+                    string filePath = stageDir + '\\' + file;
                     FileInfo fileInfo = new FileInfo(filePath);
 
                     if (boringFiles.Contains(fileInfo.Name) || fileInfo.Extension.Contains("rbx"))
@@ -561,7 +325,7 @@ namespace RobloxClientTracker
 
         static bool initGitBinding(string repository)
         {
-            string gitBinding = Path.Combine(StageDir, ".git");
+            string gitBinding = Path.Combine(stageDir, ".git");
 
             if (!Directory.Exists(gitBinding))
             {
@@ -591,7 +355,7 @@ namespace RobloxClientTracker
                 string sshCommand = $"ssh -i {privateKey}";
                 string repoUrl = $"git@github.com:{owner}/{repository}.git";
 
-                git($"clone -c core.sshCommand=\"{sshCommand}\" {repoUrl} {StageDir}");
+                git($"clone -c core.sshCommand=\"{sshCommand}\" {repoUrl} {stageDir}");
 
                 string name = settings.BotName;
                 git("config", "--local", "user.name", '"' + name + '"');
@@ -605,116 +369,56 @@ namespace RobloxClientTracker
             return false;
         }
 
-        static async Task TrackFFlagsAsync()
+        
+        static async Task<bool> updateClientTrackerStage(ClientVersionInfo info, IEnumerable<DataMiner> miners)
         {
-            // Initialize Repository
-            initGitBinding(Settings.Default.FFlagRepoName);
+            // Make sure Roblox Studio is up to date for this build.
+            print("Syncing Roblox Studio...", GREEN);
+            await studio.UpdateStudio();
 
-            // Start tracking...
-            const string flagEndpoint = "https://clientsettingscdn.roblox.com/v1/settings/application?applicationName=";
+            // Copy some metadata generated during the studio installation.
+            string studioDir = studio.GetStudioDirectory();
 
-            var platforms = new List<string>()
+            foreach (string fileName in filesToCopy)
             {
-                "PCDesktopClient",
-                "MacDesktopClient",
-                "PCStudioBootstrapper",
-                "MacStudioBootstrapper",
-                "PCClientBootstrapper",
-                "MacClientBootstrapper",
-                "XboxClient",
-                "AndroidApp",
-                "iOSApp",
-                "StudioApp"
-            };
+                string sourcePath = Path.Combine(studioDir, fileName);
+                string destination = Path.Combine(stageDir, fileName);
 
-            print("Main thread starting!", MAGENTA);
-            git("reset --hard origin/master");
+                if (!File.Exists(sourcePath))
+                    throw new Exception($"Missing file to copy: {sourcePath}!!");
 
-            while (true)
-            {
-                print("Updating flags...", CYAN);
+                if (File.Exists(destination))
+                    File.Delete(destination);
 
-                var taskPool = new List<Task>();
-
-                foreach (string platform in platforms)
-                {
-                    Task updatePlatform = Task.Run(async () =>
-                    {
-                        string json = "";
-
-                        using (WebClient http = new WebClient())
-                        {
-                            http.Headers.Set("UserAgent", "Roblox/WinInet");
-                            json = await http.DownloadStringTaskAsync(flagEndpoint + platform);
-                        }
-
-                        using (var jsonText = new StringReader(json))
-                        {
-                            JsonTextReader reader = new JsonTextReader(jsonText);
-
-                            JObject root = JObject.Load(reader);
-                            JObject appSettings = root.Value<JObject>("applicationSettings");
-
-                            var keys = new List<string>();
-
-                            foreach (var pair in appSettings)
-                                keys.Add(pair.Key);
-
-                            var result = new StringBuilder();
-                            int testInt = 0;
-
-                            result.AppendLine("{");
-                            keys.Sort();
-
-                            for (int i = 0; i < keys.Count; i++)
-                            {
-                                string key = keys[i];
-                                string value = appSettings.Value<string>(key);
-
-                                if (i != 0)
-                                    result.Append(",\r\n");
-
-                                if (value == "True" || value == "False")
-                                    value = value.ToLower();
-                                else if (!int.TryParse(value, out testInt))
-                                    value = '"' + value + '"';
-                                 
-                                result.Append($"\t\"{key}\": {value}");
-                            }
-
-                            result.Append("\r\n}");
-
-                            string filePath = Path.Combine(StageDir, platform + ".json");
-                            string newFile = result.ToString();
-                            string oldFile = "";
-
-                            if (File.Exists(filePath))
-                                oldFile = File.ReadAllText(filePath);
-
-                            if (oldFile != newFile)
-                            {
-                                print($"\tUpdating {platform}.json ...", YELLOW);
-                                File.WriteAllText(filePath, newFile);
-                            }
-                        }
-                    });
-
-                    taskPool.Add(updatePlatform);
-                }
-
-                await Task.WhenAll(taskPool);
-
-                string timeStamp = DateTime.Now.ToString();
-                pushCommit(timeStamp);
-
-                print($"Next update check in {UPDATE_FREQUENCY} minutes.", YELLOW);
-                await Task.Delay(UPDATE_FREQUENCY * 60000);
+                File.Copy(sourcePath, destination);
             }
+
+            // Run data mining routines in parallel
+            // so they don't block each other.
+
+            var routines = new List<Task>();
+
+            foreach (DataMiner miner in miners)
+            {
+                Type type = miner.GetType();
+                print($"Executing data miner routine: {type.Name}", GREEN);
+
+                Task routine = Task.Run(() => miner.ExecuteRoutine());
+                routines.Add(routine);
+            }
+
+            await Task.WhenAll(routines);
+
+            foreach (Task routine in routines)
+                if (routine.Status == TaskStatus.Faulted)
+                    throw routine.Exception;
+
+            return true;
         }
 
         static async Task TrackClientAsync()
         {
-            string currentVersion = BranchRegistry.GetString("Version");
+            // Initialize the git repository.
             bool init = initGitBinding(Settings.Default.ClientRepoName);
 
             if (init)
@@ -732,9 +436,21 @@ namespace RobloxClientTracker
                 }
             }
 
-            Studio = new StudioBootstrapper(branch);
-            StudioPath = Studio.GetStudioPath();
+            // Setup studio bootstrapper.
+            studio = new StudioBootstrapper(branch);
+            studioPath = studio.GetStudioPath();
 
+            // Setup data miner tasks.
+            var dataMiners = AppDomain.CurrentDomain
+                .GetAssemblies()
+                .SelectMany(assembly => assembly.GetTypes())
+                .Where(type => !type.IsAbstract)
+                .Where(type => type.IsSubclassOf(DataMiner))
+                .Select(type => Activator.CreateInstance(type))
+                .Cast<DataMiner>();
+
+            // Start the main thread.
+            string currentVersion = BranchRegistry.GetString("Version");
             print("Main thread starting!", MAGENTA);
 
             if (FORCE_REBASE)
@@ -782,7 +498,7 @@ namespace RobloxClientTracker
                     if (FORCE_UPDATE || info.Guid != currentVersion)
                     {
                         print("Update detected!", YELLOW);
-                        await updateStage(info);
+                        await updateClientTrackerStage(info, dataMiners);
 
                         // Create two commits:
                         // - One for package files.
@@ -813,6 +529,98 @@ namespace RobloxClientTracker
                     print($"Exception Thrown: {e.Message}\n{e.StackTrace}\nTiming out for 1 minute.", RED);
                     await Task.Delay(60000);
                 }
+            }
+        }
+
+        static async Task TrackFFlagsAsync()
+        {
+            // Initialize Repository
+            initGitBinding(Settings.Default.FFlagRepoName);
+
+            // Start tracking...
+            
+
+            print("Main thread starting!", MAGENTA);
+            git("reset --hard origin/master");
+
+            while (true)
+            {
+                print("Updating flags...", CYAN);
+                var taskPool = new List<Task>();
+
+                foreach (string platform in fflagPlatforms)
+                {
+                    Task updatePlatform = Task.Run(async () =>
+                    {
+                        string json = "";
+
+                        using (WebClient http = new WebClient())
+                        {
+                            http.Headers.Set("UserAgent", "Roblox/WinInet");
+                            json = await http.DownloadStringTaskAsync(fflagEndpoint + platform);
+                        }
+
+                        using (var jsonText = new StringReader(json))
+                        {
+                            JsonTextReader reader = new JsonTextReader(jsonText);
+
+                            JObject root = JObject.Load(reader);
+                            JObject appSettings = root.Value<JObject>("applicationSettings");
+
+                            var keys = new List<string>();
+
+                            foreach (var pair in appSettings)
+                                keys.Add(pair.Key);
+
+                            var result = new StringBuilder();
+                            int testInt = 0;
+
+                            result.AppendLine("{");
+                            keys.Sort();
+
+                            for (int i = 0; i < keys.Count; i++)
+                            {
+                                string key = keys[i];
+                                string value = appSettings.Value<string>(key);
+
+                                if (i != 0)
+                                    result.Append(",\r\n");
+
+                                if (value == "True" || value == "False")
+                                    value = value.ToLower();
+                                else if (!int.TryParse(value, out testInt))
+                                    value = '"' + value + '"';
+                                 
+                                result.Append($"\t\"{key}\": {value}");
+                            }
+
+                            result.Append("\r\n}");
+
+                            string filePath = Path.Combine(stageDir, platform + ".json");
+                            string newFile = result.ToString();
+                            string oldFile = "";
+
+                            if (File.Exists(filePath))
+                                oldFile = File.ReadAllText(filePath);
+
+                            if (oldFile != newFile)
+                            {
+                                print($"\tUpdating {platform}.json ...", YELLOW);
+                                File.WriteAllText(filePath, newFile);
+                            }
+                        }
+                    });
+
+                    taskPool.Add(updatePlatform);
+                }
+
+                await Task.WhenAll(taskPool);
+
+                string timeStamp = DateTime.Now.ToString();
+                pushCommit(timeStamp);
+
+                print($"Next update check in {UPDATE_FREQUENCY} minutes.", YELLOW);
+                await Task.Delay(UPDATE_FREQUENCY * 60000);
             }
         }
 
@@ -879,16 +687,16 @@ namespace RobloxClientTracker
             RootRegistry = Registry.CurrentUser.Open("Software", "RobloxClientTracker");
             BranchRegistry = RootRegistry.Open(branch);
 
-            Trunk = CreateDirectory(@"C:\Roblox-Client-Tracker");
-            StageDir = CreateDirectory(Trunk, "stage", branch);
+            trunk = createDirectory(@"C:\Roblox-Client-Tracker");
+            stageDir = createDirectory(trunk, "stage", branch);
 
             ServicePointManager.SecurityProtocol = SecurityProtocolType.Tls | SecurityProtocolType.Tls11 | SecurityProtocolType.Tls12 | SecurityProtocolType.Ssl3;
             Task mainThread = null;
 
             if (TRACK_MODE == TrackMode.Client)
-                mainThread = Task.Run(() => TrackClientAsync());
+                mainThread = Task.Run(TrackClientAsync);
             else if (TRACK_MODE == TrackMode.FastFlags)
-                mainThread = Task.Run(() => TrackFFlagsAsync());
+                mainThread = Task.Run(TrackFFlagsAsync);
 
             mainThread?.Wait();
         }

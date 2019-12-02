@@ -5,33 +5,31 @@ using System.Linq;
 
 namespace RobloxClientTracker
 {
-    public static class ShaderData
+    public class UnpackShaders : DataMiner
     {
-        public static FileLogConfig LogShader = new FileLogConfig()
+        public override ConsoleColor LogColor => ConsoleColor.Green;
+
+        private static FileLogConfig LogShader = new FileLogConfig()
         {
-            Color = Program.DARK_GREEN,
+            Color = ConsoleColor.DarkGreen,
             Stack = 2
         };
 
-        private static void print(string msg)
+        public void WriteShader(string path, string contents)
         {
-            Program.print(msg, Program.GREEN);
+            writeFile(path, contents, LogShader);
         }
-
-        public static void Extract()
+        
+        public override void ExecuteRoutine()
         {
-            string stageDir = Program.StageDir;
-            var studio = Program.Studio;
-
             string studioDir = studio.GetStudioDirectory();
             string shaderDir = Path.Combine(studioDir, "shaders");
 
-            var packNames = new List<string>();
-
+            var names = new List<string>();
             var shaders = new Dictionary<string, string>();
             var shaderPacks = new Dictionary<string, HashSet<string>>();
 
-            string newShaderDir = Program.CreateDirectory(stageDir, "shaders");
+            string newShaderDir = createDirectory(stageDir, "shaders");
             print("Unpacking shader packs...");
 
             foreach (string shaderPath in Directory.GetFiles(shaderDir))
@@ -39,14 +37,14 @@ namespace RobloxClientTracker
                 ShaderPack pack = new ShaderPack(shaderPath);
                 var myShaders = new Dictionary<string, string>();
 
-                string packName = pack.Name.Replace("shaders_", "");
-                packNames.Add(packName);
+                string name = pack.Name.Replace("shaders_", "");
+                names.Add(name);
 
                 List<ShaderFile> shaderFiles = pack.Shaders.ToList();
                 shaderFiles.Sort();
 
-                print($"\tUnpacking shader file {packName}...");
-                HashSet<string> hashes = pack.UnpackShader(newShaderDir, LogShader);
+                print($"\tUnpacking shader file {name}...");
+                HashSet<string> hashes = pack.UnpackShader(this, newShaderDir);
 
                 foreach (ShaderFile file in shaderFiles)
                 {
@@ -59,7 +57,7 @@ namespace RobloxClientTracker
                     if (!shaderPacks.ContainsKey(shader))
                         shaderPacks.Add(shader, new HashSet<string>());
 
-                    shaderPacks[shader].Add(packName);
+                    shaderPacks[shader].Add(name);
                 }
 
                 var myLines = new List<string>();
@@ -79,11 +77,11 @@ namespace RobloxClientTracker
                 myManifest = CsvBuilder.Convert(myManifest, "Name", "Shader Type");
 
                 string newShaderPathCsv = Path.Combine(newShaderDir, pack.Name + ".csv");
-                Program.WriteFile(newShaderPathCsv, myManifest, LogShader);
+                writeFile(newShaderPathCsv, myManifest, LogShader);
             }
 
             var headers = new List<string>() { "Name", "Shader Type" };
-            headers.AddRange(packNames);
+            headers.AddRange(names);
 
             var shaderNames = shaders.Keys.ToList();
             shaderNames.Sort();
@@ -98,18 +96,18 @@ namespace RobloxClientTracker
                 lines.Add(shader);
                 lines.Add(type);
 
-                foreach (string packName in packNames)
+                foreach (string name in names)
                 {
-                    string check = packs.Contains(packName) ? "✔" : "❌";
+                    string check = packs.Contains(name) ? "✔" : "❌";
                     lines.Add(check);
                 }
             }
 
             string manifest = string.Join("\r\n", lines);
-            manifest = CsvBuilder.Convert(manifest, headers.ToArray());
+            manifest = CsvBuilder.Convert(manifest, headers);
 
             string manifestPath = Path.Combine(stageDir, "RobloxShaderData.csv");
-            Program.WriteFile(manifestPath, manifest, LogShader);
+            writeFile(manifestPath, manifest, LogShader);
 
             print("Shaders unpacked!");
         }

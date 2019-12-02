@@ -211,8 +211,6 @@ namespace RobloxClientTracker
         {
             string binaryType = GetStudioBinaryType();
 
-            /*if (branch == "roblox")
-                return await ClientVersionInfo.Get(binaryType);*/
 
             if (fastGuid == "")
                 fastGuid = await GetFastVersionGuid(branch);
@@ -436,8 +434,7 @@ namespace RobloxClientTracker
 
         public string GetStudioDirectory()
         {
-            string trunk = Program.Trunk;
-            return getDirectory(trunk, "builds", branch);
+            return getDirectory(Program.trunk, "builds", branch);
         }
 
         public string GetStudioPath()

@@ -1,16 +1,29 @@
-﻿using System.Collections.Generic;
+﻿using System;
+using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Text.RegularExpressions;
-using System.Threading.Tasks;
 
 namespace RobloxClientTracker
 {
-    public static class StudioStrings
+    public class ExtractStudioStrings : MultiTaskMiner
     {
-        private static void print(string msg)
+        public override ConsoleColor LogColor => ConsoleColor.Magenta;
+        private string studioExe;
+
+        public override void ExecuteRoutine()
         {
-            Program.print(msg, Program.MAGENTA);
+            // Both of the routines datamine 
+            // Roblox Studio, so preload it first.
+
+            print("Reading Roblox Studio...");
+            studioExe = File.ReadAllText(studioPath);
+
+            // Now execute the routines.
+            addRoutine(extractCppTypes);
+            addRoutine(extractDeepStrings);
+            
+            base.ExecuteRoutine();
         }
 
         private static List<string> hackOutPattern(string source, string pattern)
@@ -41,12 +54,11 @@ namespace RobloxClientTracker
             return lines;
         }
 
-        private static void extractDeepStrings(string file)
+        private void extractDeepStrings()
         {
             print("Extracting Deep Strings...");
 
-            string stageDir = Program.StageDir;
-            MatchCollection matches = Regex.Matches(file, "([A-Z][A-z][A-z_0-9.]{8,256})+[A-z0-9]?");
+            var matches = Regex.Matches(studioExe, "([A-Z][A-z][A-z_0-9.]{8,256})+[A-z0-9]?");
 
             var lines = matches.Cast<Match>()
                 .Select(match => match.Value)
@@ -56,16 +68,14 @@ namespace RobloxClientTracker
             string deepStrings = string.Join("\n", lines);
             string deepStringsPath = Path.Combine(stageDir, "DeepStrings.txt");
 
-            Program.WriteFile(deepStringsPath, deepStrings);
+            writeFile(deepStringsPath, deepStrings);
         }
 
-        private static void extractCppTypes(string file)
+        private void extractCppTypes()
         {
             print("Extracting CPP types...");
 
-            string stageDir = Program.StageDir;
-            List<string> classes = hackOutPattern(file, "AV[A-z][A-z0-9_@?]+");
-            
+            var classes = hackOutPattern(studioExe, "AV[A-z][A-z0-9_@?]+");
             var RBX = new NameTree("RBX");
 
             foreach (string linkerChunk in classes)
@@ -96,19 +106,7 @@ namespace RobloxClientTracker
             string cppTree = RBX.WriteTree();
             string cppTreePath = Path.Combine(stageDir, "CppTree.txt");
 
-            Program.WriteFile(cppTreePath, cppTree);
-        }
-
-        public static void Extract()
-        {
-            string studioPath = Program.StudioPath;
-            string file = File.ReadAllText(studioPath);
-
-            Task cppTypes = Task.Run(() => extractCppTypes(file));
-            Task deepStrings = Task.Run(() => extractDeepStrings(file));
-
-            Task extraction = Task.WhenAll(cppTypes, deepStrings);
-            extraction.Wait();
+            writeFile(cppTreePath, cppTree);
         }
     }
 }

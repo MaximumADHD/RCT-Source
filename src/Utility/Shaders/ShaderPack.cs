@@ -79,7 +79,7 @@ namespace RobloxClientTracker
             }
         }
 
-        public HashSet<string> UnpackShader(string exportDir, FileLogConfig logConfig)
+        public HashSet<string> UnpackShader(UnpackShaders unpacker, string exportDir)
         {
             var shaderManifest = Program.BranchRegistry.Open("ShaderManifest");
             string shaderKey = Name.Replace("shaders_", "");
@@ -100,7 +100,7 @@ namespace RobloxClientTracker
             {
                 hashes.Add(rootShader.Hash);
                 names.Add(rootShader.RegistryKey);
-                rootShader.WriteFile(unpackDir, shaderReg, logConfig);
+                rootShader.WriteFile(unpacker, unpackDir, shaderReg);
             }
 
             foreach (ShaderFile otherShader in otherShaders)
@@ -112,7 +112,7 @@ namespace RobloxClientTracker
                 {
                     hashes.Add(otherShader.Hash);
                     names.Add(otherShader.RegistryKey);
-                    otherShader.WriteFile(groupDir, shaderReg, logConfig);
+                    otherShader.WriteFile(unpacker, groupDir, shaderReg);
                 }
             }
 
