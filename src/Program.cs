@@ -212,13 +212,7 @@ namespace RobloxClientTracker
 
             return outLines;
         }
-
-        static string getBranchHash(string branchName)
-        {
-            var query = git("rev-parse", branchName);
-            return query.First();
-        }
-
+        
         static List<string> getChangedFiles(string branch, string filter)
         {
             var query = git("status", "-s");
@@ -475,8 +469,7 @@ namespace RobloxClientTracker
                         if (FORCE_REBASE || isRemoteBehind($"origin/{branch}", $"origin/{parent}"))
                         {
                             // Discard any local changes that might still be lingering.
-                            string branchHash = getBranchHash($"origin/{branch}");
-                            git("reset", "--hard", branchHash);
+                            git("reset", "--hard", $"origin/{branch}");
                             git("clean -d -f");
 
                             // Merge with the parent upstream, keeping our own changes.
@@ -485,9 +478,35 @@ namespace RobloxClientTracker
                             string message = $"Merge {parent}->{branch}";
                             print($"Merging ({parent}->{branch})...", MAGENTA);
 
-                            git("merge", $"-m \"{message}\"", "-X ours", $"origin/{parent}");
-                            git("push");
+                            var mergeResults = git("merge", $"-m \"{message}\"", "-X ours", $"origin/{parent}");
+                            bool hasConflicts = false;
 
+                            // Check if some merge conflicts have shown up.
+                            // This usually happens with LuaPackages >:(
+
+                            foreach (string result in mergeResults)
+                            {
+                                if (result.StartsWith("CONFLICT"))
+                                {
+                                    int splitPos = result.IndexOf(':') + 1;
+
+                                    string prefix = result.Substring(0, splitPos);
+                                    string msg = result.Substring(splitPos);
+
+                                    log(prefix, RED);
+                                    print(msg, WHITE);
+
+                                    hasConflicts = true;
+                                }
+                            }
+
+                            if (hasConflicts)
+                            {
+                                print("Unfortunately we have to do a hard reset :(", MAGENTA);
+                                git("reset", "--hard", $"origin/{parent}");
+                            }
+
+                            git("push", "--force");
                             currentVersion = "";
                         }
                     }
@@ -538,10 +557,10 @@ namespace RobloxClientTracker
             initGitBinding(Settings.Default.FFlagRepoName);
 
             // Start tracking...
-            
-
             print("Main thread starting!", MAGENTA);
+
             git("reset --hard origin/master");
+            git("pull");
 
             while (true)
             {
