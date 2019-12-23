@@ -39,7 +39,7 @@ namespace RobloxClientTracker
             start.WaitOne();
 
             int timeOut = 0;
-            const int numTries = 128;
+            const int numTries = 32;
 
             print("\tWaiting for StudioAppSettings.json to be written...");
             FileInfo info = new FileInfo(settingsPath);
@@ -58,6 +58,13 @@ namespace RobloxClientTracker
 
                 var delay = Task.Delay(30);
                 delay.Wait();
+            }
+
+            if (info.Length == 0)
+            {
+                print("FAST FLAG EXTRACTION FAILED!", ConsoleColor.Red);
+                update.Kill();
+                return;
             }
 
             string file = File.ReadAllText(settingsPath);

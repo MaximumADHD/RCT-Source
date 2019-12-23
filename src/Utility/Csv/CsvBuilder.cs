@@ -43,8 +43,15 @@ namespace RobloxClientTracker
 
         public static void Convert(string path, string[] headers, Action<string> callback)
         {
+            if (!File.Exists(path))
+            {
+                Program.print("Missing CSV file: " + path, ConsoleColor.Red);
+                return;
+            }
+
             string file = File.ReadAllText(path);
             string csv = Convert(file, headers);
+
             callback(csv);
         }
 

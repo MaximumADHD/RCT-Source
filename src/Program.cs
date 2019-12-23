@@ -35,6 +35,7 @@ namespace RobloxClientTracker
         const string ARG_FORCE_REBASE = "-forceRebase";
         const string ARG_FORCE_UPDATE = "-forceUpdate";
         const string ARG_FORCE_COMMIT = "-forceCommit";
+        const string ARG_MANUAL_BUILD = "-manualBuild";
         const string ARG_VERBOSE_GIT_LOGS = "-verboseGitLogs";
         const string ARG_UPDATE_FREQUENCY = "-updateFrequency";
         const string ARG_FORCE_VERSION_GUID = "-forceVersionGuid";
@@ -58,6 +59,7 @@ namespace RobloxClientTracker
 
         static int UPDATE_FREQUENCY = 5;
         static bool VERBOSE_GIT_LOGS = false;
+        static bool MANUAL_BUILD = false;
 
         static TrackMode TRACK_MODE = TrackMode.Client;
         static readonly Type DataMiner = typeof(DataMiner);
@@ -367,9 +369,13 @@ namespace RobloxClientTracker
         static async Task<bool> updateClientTrackerStage(ClientVersionInfo info, IEnumerable<DataMiner> miners)
         {
             // Make sure Roblox Studio is up to date for this build.
-            print("Syncing Roblox Studio...", GREEN);
-            await studio.UpdateStudio();
 
+            if (!MANUAL_BUILD)
+            {
+                print("Syncing Roblox Studio...", GREEN);
+                await studio.UpdateStudio();
+            }
+            
             // Copy some metadata generated during the studio installation.
             string studioDir = studio.GetStudioDirectory();
 
@@ -379,8 +385,18 @@ namespace RobloxClientTracker
                 string destination = Path.Combine(stageDir, fileName);
 
                 if (!File.Exists(sourcePath))
-                    throw new Exception($"Missing file to copy: {sourcePath}!!");
+                {
+                    string errorMsg = $"Missing file to copy: {sourcePath}!!";
 
+                    if (MANUAL_BUILD)
+                    {
+                        print(errorMsg, YELLOW);
+                        continue;
+                    }
+
+                    throw new Exception(errorMsg);
+                }
+                
                 if (File.Exists(destination))
                     File.Delete(destination);
 
@@ -512,9 +528,31 @@ namespace RobloxClientTracker
                     }
 
                     // Check for updates to the version
-                    var info = await StudioBootstrapper.GetCurrentVersionInfo(branch);
 
-                    if (FORCE_UPDATE || info.Guid != currentVersion)
+                    ClientVersionInfo info = null;
+
+                    if (MANUAL_BUILD)
+                    {
+                        print($"WARNING: Using manual build for branch {branch}!");
+
+                        string buildDir = Path.Combine(trunk, "builds", branch);
+                        string versionFile = Path.Combine(buildDir, "version.txt");
+
+                        if (!File.Exists(versionFile))
+                            throw new Exception($"MISSING FILE {versionFile}");
+
+                        info = new ClientVersionInfo()
+                        {
+                            Guid = "version-$guid",
+                            Version = File.ReadAllText(versionFile)
+                        };
+                    }
+                    else
+                    {
+                        info = await StudioBootstrapper.GetCurrentVersionInfo(branch);
+                    }
+                    
+                    if (FORCE_UPDATE || MANUAL_BUILD || info.Guid != currentVersion)
                     {
                         print("Update detected!", YELLOW);
                         await updateClientTrackerStage(info, dataMiners);
@@ -600,13 +638,15 @@ namespace RobloxClientTracker
                             for (int i = 0; i < keys.Count; i++)
                             {
                                 string key = keys[i];
+
                                 string value = appSettings.Value<string>(key);
+                                string lower = value.ToLower();
 
                                 if (i != 0)
                                     result.Append(",\r\n");
 
-                                if (value == "True" || value == "False")
-                                    value = value.ToLower();
+                                if (lower == "true" || lower == "false")
+                                    value = lower;
                                 else if (!int.TryParse(value, out testInt))
                                     value = '"' + value + '"';
                                  
@@ -684,6 +724,9 @@ namespace RobloxClientTracker
 
             if (argMap.ContainsKey(ARG_VERBOSE_GIT_LOGS))
                 VERBOSE_GIT_LOGS = true;
+
+            if (argMap.ContainsKey(ARG_MANUAL_BUILD))
+                MANUAL_BUILD = true;
 
             if (argMap.ContainsKey(ARG_UPDATE_FREQUENCY))
                 int.TryParse(argMap[ARG_UPDATE_FREQUENCY], out UPDATE_FREQUENCY);
