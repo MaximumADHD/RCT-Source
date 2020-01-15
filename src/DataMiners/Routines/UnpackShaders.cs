@@ -34,6 +34,11 @@ namespace RobloxClientTracker
 
             foreach (string shaderPath in Directory.GetFiles(shaderDir))
             {
+                FileInfo info = new FileInfo(shaderPath);
+
+                if (info.Extension != ".pack")
+                    continue;
+
                 ShaderPack pack = new ShaderPack(shaderPath);
                 var myShaders = new Dictionary<string, string>();
 

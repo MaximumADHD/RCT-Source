@@ -557,21 +557,34 @@ namespace RobloxClientTracker
                         print("Update detected!", YELLOW);
                         await updateClientTrackerStage(info, dataMiners);
 
-                        // Create two commits:
-                        // - One for package files.
-                        // - One for everything else.
+                        
+                        if (MANUAL_BUILD)
+                        {
+                            print($"Stage assembled! Please create a commit with -m \"{info.Version}\"!", GREEN);
+                            print("Press any key to continue...");
 
-                        string versionId = info.Version;
-                        print("Creating commits...", YELLOW);
+                            Console.Read();
+                            Environment.Exit(0);
+                        }
+                        else
+                        {
+                            // Create two commits:
+                            // - One for package files.
+                            // - One for everything else.
 
-                        bool didSubmitPackages = pushCommit($"{versionId} (Packages)", "*/Packages/*");
-                        bool didSubmitCore = pushCommit(versionId);
+                            string versionId = info.Version;
+                            print("Creating commits...", YELLOW);
 
-                        if (didSubmitPackages || didSubmitCore)
-                            print("Done!", GREEN);
+                            bool didSubmitPackages = pushCommit($"{versionId} (Packages)", "*/Packages/*");
+                            bool didSubmitCore = pushCommit(versionId);
 
-                        currentVersion = info.Guid;
-                        BranchRegistry.SetValue("Version", info.Guid);
+                            if (didSubmitPackages || didSubmitCore)
+                                print("Done!", GREEN);
+
+                            currentVersion = info.Guid;
+                            BranchRegistry.SetValue("Version", info.Guid);
+                        }
+                        
                     }
                     else
                     {
