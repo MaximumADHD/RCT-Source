@@ -16,7 +16,9 @@ namespace RobloxClientTracker
     {
         private string branch;
         private string buildVersion;
+
         private FileManifest fileManifest;
+        private HashSet<string> writtenFiles;
 
         private const string appSettingsXml =
             "<Settings>\n" +
@@ -141,28 +143,34 @@ namespace RobloxClientTracker
                             {
                                 // Confirm that this file no longer exists in the manifest.
                                 string sig;
+                                bool delete = true;
 
                                 using (FileStream file = File.OpenRead(filePath))
                                     sig = computeSignature(file);
 
-                                if (!fileManifest.ContainsValue(sig))
+                                if (fileManifest.ContainsValue(sig))
+                                {
+                                    if (!fileName.StartsWith("content"))
+                                    {
+                                        // The path may have been labeled incorrectly in the manifest.
+                                        // Record it for future reference so we don't have to
+                                        // waste time computing the signature later on.
+
+                                        string fixedName = fileManifest
+                                            .Where(pair => pair.Value == sig)
+                                            .Select(pair => pair.Key)
+                                            .First();
+
+                                        fileRepairs.SetValue(fileName, fixedName);
+                                        delete = false;
+                                    }
+                                }
+
+                                if (delete)
                                 {
                                     echo($"Deleting unused file {fileName}");
                                     fileRegistry.DeleteValue(fileName);
                                     File.Delete(filePath);
-                                }
-                                else if (!fileName.StartsWith("content"))
-                                {
-                                    // The path may have been labeled incorrectly in the manifest.
-                                    // Record it for future reference so we don't have to
-                                    // waste time computing the signature later on.
-
-                                    string fixedName = fileManifest
-                                        .Where(pair => pair.Value == sig)
-                                        .Select(pair => pair.Key)
-                                        .First();
-
-                                    fileRepairs.SetValue(fileName, fixedName);
                                 }
                             }
                             catch
@@ -251,6 +259,8 @@ namespace RobloxClientTracker
 
             if ((pkgDir == "Plugins" || pkgDir == "Qml") && !filePath.StartsWith(pkgDir))
                 filePath = pkgDir + '\\' + filePath;
+            else if (filePath.StartsWith("ExtraContent"))
+                filePath = filePath.Replace("ExtraContent", "content");
 
             return filePath;
         }
@@ -332,7 +342,6 @@ namespace RobloxClientTracker
 
                         // If we can find this file path in the file manifest, then we will
                         // use its pre-computed signature to check if the file has changed.
-
                         newFileSig = hasFilePath ? fileManifest[filePath] : null;
                     }
 
@@ -503,6 +512,7 @@ namespace RobloxClientTracker
                 echo($"Installing Version {versionId} of Roblox Studio...");
 
                 var taskQueue = new List<Task>();
+                writtenFiles = new HashSet<string>();
 
                 echo("Grabbing package manifest...");
                 var pkgManifest = await PackageManifest.Get(branch, buildVersion);

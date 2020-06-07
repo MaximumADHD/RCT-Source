@@ -92,7 +92,6 @@ namespace RobloxClientTracker
             "version.txt",
             "version-guid.txt",
 
-            "FVariables.txt",
             "DeepStrings.txt",
         };
 
@@ -281,10 +280,13 @@ namespace RobloxClientTracker
                     string filePath = stageDir + '\\' + file;
                     FileInfo fileInfo = new FileInfo(filePath);
 
-                    if (boringFiles.Contains(fileInfo.Name) || fileInfo.Extension.Contains("rbx"))
+                    if (branch != "roblox")
                     {
-                        boringCount++;
-                        continue;
+                        if (boringFiles.Contains(fileInfo.Name) || fileInfo.Extension.Contains("rbx"))
+                        {
+                            boringCount++;
+                            continue;
+                        }
                     }
 
                     updateCount++;
@@ -299,9 +301,6 @@ namespace RobloxClientTracker
             {
                 print($"[{label}]\tCommitting...", CYAN);
                 git($"commit -m \"{label}\"");
-
-                print($"[{label}]\tPushing commit...", CYAN);
-                git($"push");
 
                 return true;
             }
@@ -365,7 +364,6 @@ namespace RobloxClientTracker
             return false;
         }
 
-        
         static async Task<bool> updateClientTrackerStage(ClientVersionInfo info, IEnumerable<DataMiner> miners)
         {
             // Make sure Roblox Studio is up to date for this build.
@@ -482,7 +480,7 @@ namespace RobloxClientTracker
                     if (branch != parent)
                     {
                         // Check if we are behind the upstream.
-                        if (FORCE_REBASE || isRemoteBehind($"origin/{branch}", $"origin/{parent}"))
+                        if (!MANUAL_BUILD && (FORCE_REBASE || isRemoteBehind($"origin/{branch}", $"origin/{parent}")))
                         {
                             // Discard any local changes that might still be lingering.
                             git("reset", "--hard", $"origin/{branch}");
@@ -491,6 +489,7 @@ namespace RobloxClientTracker
                             // Merge with the parent upstream, keeping our own changes.
                             // The assumption right now is that child branches are
                             // ahead of the parent branches and will replace them.
+
                             string message = $"Merge {parent}->{branch}";
                             print($"Merging ({parent}->{branch})...", MAGENTA);
 
@@ -557,7 +556,6 @@ namespace RobloxClientTracker
                         print("Update detected!", YELLOW);
                         await updateClientTrackerStage(info, dataMiners);
 
-                        
                         if (MANUAL_BUILD)
                         {
                             print($"Stage assembled! Please create a commit with -m \"{info.Version}\"!", GREEN);
@@ -568,18 +566,25 @@ namespace RobloxClientTracker
                         }
                         else
                         {
-                            // Create two commits:
-                            // - One for package files.
+                            // Create three commits:
+                            // - One for packages.
+                            // - One for lua files.
                             // - One for everything else.
 
                             string versionId = info.Version;
                             print("Creating commits...", YELLOW);
 
-                            bool didSubmitPackages = pushCommit($"{versionId} (Packages)", "*/Packages/*");
-                            bool didSubmitCore = pushCommit(versionId);
+                            bool didStagePackages = pushCommit($"{versionId} (Packages)", "*/_Index/*");
+                            bool didStageScripts = pushCommit($"{versionId} (Scripts)", "*.lua");
+                            bool didStageCore = pushCommit(versionId);
 
-                            if (didSubmitPackages || didSubmitCore)
-                                print("Done!", GREEN);
+                            if (didStagePackages || didStageScripts || didStageCore)
+                            {
+                                print($"Pushing to GitHub...", CYAN);
+                                git($"push");
+
+                                print("\tDone!", GREEN);
+                            }
 
                             currentVersion = info.Guid;
                             BranchRegistry.SetValue("Version", info.Guid);
@@ -616,83 +621,92 @@ namespace RobloxClientTracker
             while (true)
             {
                 print("Updating flags...", CYAN);
-                var taskPool = new List<Task>();
 
-                foreach (string platform in fflagPlatforms)
+                try
                 {
-                    Task updatePlatform = Task.Run(async () =>
+                    var taskPool = new List<Task>();
+
+                    foreach (string platform in fflagPlatforms)
                     {
-                        string json = "";
-
-                        using (WebClient http = new WebClient())
+                        Task updatePlatform = Task.Run(async () =>
                         {
-                            http.Headers.Set("UserAgent", "Roblox/WinInet");
-                            json = await http.DownloadStringTaskAsync(fflagEndpoint + platform);
-                        }
+                            string json = "";
 
-                        using (var jsonText = new StringReader(json))
-                        {
-                            JsonTextReader reader = new JsonTextReader(jsonText);
-
-                            JObject root = JObject.Load(reader);
-                            JObject appSettings = root.Value<JObject>("applicationSettings");
-
-                            var keys = new List<string>();
-
-                            foreach (var pair in appSettings)
-                                keys.Add(pair.Key);
-
-                            var result = new StringBuilder();
-                            int testInt = 0;
-
-                            result.AppendLine("{");
-                            keys.Sort();
-
-                            for (int i = 0; i < keys.Count; i++)
+                            using (WebClient http = new WebClient())
                             {
-                                string key = keys[i];
-
-                                string value = appSettings.Value<string>(key);
-                                string lower = value.ToLower();
-
-                                if (i != 0)
-                                    result.Append(",\r\n");
-
-                                if (lower == "true" || lower == "false")
-                                    value = lower;
-                                else if (!int.TryParse(value, out testInt))
-                                    value = '"' + value + '"';
-                                 
-                                result.Append($"\t\"{key}\": {value}");
+                                http.Headers.Set("UserAgent", "Roblox/WinInet");
+                                json = await http.DownloadStringTaskAsync(fflagEndpoint + platform);
                             }
 
-                            result.Append("\r\n}");
-
-                            string filePath = Path.Combine(stageDir, platform + ".json");
-                            string newFile = result.ToString();
-                            string oldFile = "";
-
-                            if (File.Exists(filePath))
-                                oldFile = File.ReadAllText(filePath);
-
-                            if (oldFile != newFile)
+                            using (var jsonText = new StringReader(json))
                             {
-                                print($"\tUpdating {platform}.json ...", YELLOW);
-                                File.WriteAllText(filePath, newFile);
-                            }
-                        }
-                    });
+                                JsonTextReader reader = new JsonTextReader(jsonText);
 
-                    taskPool.Add(updatePlatform);
+                                JObject root = JObject.Load(reader);
+                                JObject appSettings = root.Value<JObject>("applicationSettings");
+
+                                var keys = new List<string>();
+
+                                foreach (var pair in appSettings)
+                                    keys.Add(pair.Key);
+
+                                var result = new StringBuilder();
+                                int testInt = 0;
+
+                                result.AppendLine("{");
+                                keys.Sort();
+
+                                for (int i = 0; i < keys.Count; i++)
+                                {
+                                    string key = keys[i];
+
+                                    string value = appSettings.Value<string>(key);
+                                    string lower = value.ToLower();
+
+                                    if (i != 0)
+                                        result.Append(",\r\n");
+
+                                    if (lower == "true" || lower == "false")
+                                        value = lower;
+                                    else if (!int.TryParse(value, out testInt))
+                                        value = '"' + value + '"';
+
+                                    result.Append($"\t\"{key}\": {value}");
+                                }
+
+                                result.Append("\r\n}");
+
+                                string filePath = Path.Combine(stageDir, platform + ".json");
+                                string newFile = result.ToString();
+                                string oldFile = "";
+
+                                if (File.Exists(filePath))
+                                    oldFile = File.ReadAllText(filePath);
+
+                                if (oldFile != newFile)
+                                {
+                                    print($"\tUpdating {platform}.json ...", YELLOW);
+                                    File.WriteAllText(filePath, newFile);
+                                }
+                            }
+                        });
+
+                        taskPool.Add(updatePlatform);
+                    }
+
+                    await Task.WhenAll(taskPool);
+
+                    string timeStamp = DateTime.Now.ToString();
+                    pushCommit(timeStamp);
+
+                    print($"Next update check in {UPDATE_FREQUENCY} minutes.", YELLOW);
+                    await Task.Delay(UPDATE_FREQUENCY * 60000);
                 }
-
-                await Task.WhenAll(taskPool);
-
-                string timeStamp = DateTime.Now.ToString();
-                pushCommit(timeStamp);
-
-                print($"Next update check in {UPDATE_FREQUENCY} minutes.", YELLOW);
-                await Task.Delay(UPDATE_FREQUENCY * 60000);
+                catch (Exception e)
+                {
+                    print($"Exception Thrown: {e.Message}\n{e.StackTrace}\nTiming out for 1 minute.", RED);
+                    await Task.Delay(60000);
+                }
             }
         }
 

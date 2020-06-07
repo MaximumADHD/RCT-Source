@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.IO;
 using System.Linq;
 
@@ -8,6 +9,9 @@ namespace RobloxClientTracker
     public class UnpackShaders : DataMiner
     {
         public override ConsoleColor LogColor => ConsoleColor.Green;
+        private HashSet<string> writtenHeaders = new HashSet<string>();
+
+        public string IncludeDir { get; private set; }
 
         private static FileLogConfig LogShader = new FileLogConfig()
         {
@@ -15,11 +19,12 @@ namespace RobloxClientTracker
             Stack = 2
         };
 
-        public void WriteShader(string path, string contents)
-        {
-            writeFile(path, contents, LogShader);
-        }
-        
+        public string ResetDirectory(params string[] traversal) => resetDirectory(traversal);
+        public void WriteShader(string path, string contents) => writeFile(path, contents, LogShader);
+
+        public bool HasHeaderFile(string header) => writtenHeaders.Contains(header);
+        public bool AddHeaderFile(string header) => writtenHeaders.Add(header);
+
         public override void ExecuteRoutine()
         {
             string studioDir = studio.GetStudioDirectory();
@@ -30,7 +35,10 @@ namespace RobloxClientTracker
             var shaderPacks = new Dictionary<string, HashSet<string>>();
 
             string newShaderDir = createDirectory(stageDir, "shaders");
+            IncludeDir = createDirectory(newShaderDir, "include");
+
             print("Unpacking shader packs...");
+            writtenHeaders.Clear();
 
             foreach (string shaderPath in Directory.GetFiles(shaderDir))
             {
@@ -56,6 +64,14 @@ namespace RobloxClientTracker
                     string shaderType = Enum.GetName(typeof(ShaderType), file.ShaderType);
                     string shader = file.Name;
 
+                    if (shaderType == null)
+                    {
+                        shaderType = "Unknown";
+                        char id = (char)file.ShaderType;
+
+                        print($"Shader '{shader}' has an unknown shader type! (Id: {id})", ConsoleColor.Red);
+                    }
+                    
                     shaders[shader] = shaderType;
                     myShaders[shader] = shaderType;
 

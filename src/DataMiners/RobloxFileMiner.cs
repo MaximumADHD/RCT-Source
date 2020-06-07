@@ -45,9 +45,6 @@ namespace RobloxClientTracker
         {
             string name = inst.Name;
 
-            if (inst.IsA<Folder>() && name == "Packages")
-                return false;
-
             if (inst.IsA<LuaSourceContainer>())
             {
                 var luaFile = inst.Cast<LuaSourceContainer>();
@@ -55,15 +52,20 @@ namespace RobloxClientTracker
                 switch (luaFile.ClassName)
                 {
                     case "Script":
+                    {
                         extension = ".server.lua";
                         break;
+                    }
                     case "LocalScript":
+                    {
                         extension = ".client.lua";
                         break;
+                    }
                     default:
+                    {
                         extension = ".lua";
                         break;
-                    //
+                    }
                 }
 
                 value = luaFile.Source;
@@ -71,8 +73,8 @@ namespace RobloxClientTracker
             else if (inst.IsA<StringValue>() && inst.Name != "AvatarPartScaleType")
             {
                 var str = inst.Cast<StringValue>();
-                value = str.Value;
                 extension = ".txt";
+                value = str.Value;
             }
             else if (inst.IsA<LocalizationTable>())
             {
@@ -90,9 +92,6 @@ namespace RobloxClientTracker
         private void unpackImpl(Instance inst, string parentDir)
         {
             string name = inst.Name;
-
-            if (inst.IsA<Folder>() && name == "Packages")
-                return;
 
             string extension = "";
             string value = "";
@@ -153,10 +152,10 @@ namespace RobloxClientTracker
 
                     unpackImpl(project, info.DirectoryName);
 
-                    if (newHash.Length > 0)
-                    {
-                        modelManifest.SetValue(regKey, newHash);
-                    }
+                    if (newHash.Length == 0)
+                        return;
+
+                    modelManifest.SetValue(regKey, newHash);
                 }
             }
         }

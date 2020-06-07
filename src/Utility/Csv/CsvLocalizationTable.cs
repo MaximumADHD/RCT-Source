@@ -68,7 +68,7 @@ namespace RobloxClientTracker
                             if (!fields.ContainsKey(header))
                                 fields.Add(header, entryType.GetField(header));
 
-                            value = fields[header].GetValue(entry) as string;
+                            value = (fields[header]?.GetValue(entry) ?? " ") as string;
                         }
                         catch
                         {

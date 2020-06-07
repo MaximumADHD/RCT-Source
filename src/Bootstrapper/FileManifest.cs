@@ -28,6 +28,9 @@ namespace RobloxClientTracker
                         if (path == null || signature == null)
                             break;
 
+                        if (path.StartsWith("ExtraContent"))
+                            path = "content" + path.Substring(12);
+
                         Add(path, signature);
                     }
                     catch

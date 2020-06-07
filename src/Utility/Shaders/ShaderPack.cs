@@ -83,18 +83,28 @@ namespace RobloxClientTracker
         {
             var shaderManifest = Program.BranchRegistry.Open("ShaderManifest");
             string shaderKey = Name.Replace("shaders_", "");
+            
             var shaderReg = shaderManifest.Open(shaderKey);
+            string root = Groups[0];
 
             var hashes = new HashSet<string>();
             var names = new HashSet<string>();
-
-            string root = Groups[0];
 
             string unpackDir = Path.Combine(exportDir, Name);
             Directory.CreateDirectory(unpackDir);
 
             var rootShaders = Shaders.Where((shader) => shader.Group == root);
             var otherShaders = Shaders.Except(rootShaders);
+
+            foreach (string dir in Directory.GetDirectories(unpackDir))
+            {
+                var info = new DirectoryInfo(dir);
+
+                if (Groups.Contains(info.Name) && info.Name != root)
+                    continue;
+
+                Directory.Delete(dir, true);
+            }
 
             foreach (ShaderFile rootShader in rootShaders)
             {
