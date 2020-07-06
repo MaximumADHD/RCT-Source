@@ -14,6 +14,9 @@ using RobloxClientTracker.Properties;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 
+using CliWrap;
+using CliWrap.EventStream;
+
 namespace RobloxClientTracker
 {
     public class Program
@@ -43,7 +46,7 @@ namespace RobloxClientTracker
         public const ConsoleColor DARK_YELLOW = ConsoleColor.DarkYellow;
         public const ConsoleColor DARK_GREEN = ConsoleColor.DarkGreen;
         public const ConsoleColor DARK_CYAN = ConsoleColor.DarkCyan;
-        
+
         public const ConsoleColor MAGENTA = ConsoleColor.Magenta;
         public const ConsoleColor YELLOW = ConsoleColor.Yellow;
         public const ConsoleColor WHITE = ConsoleColor.White;
@@ -67,7 +70,7 @@ namespace RobloxClientTracker
         public static string FORCE_VERSION_GUID = "";
         public static string FORCE_VERSION_ID = "";
 
-        static string[] fflagPlatforms = new string[]
+        static readonly string[] fflagPlatforms = new string[]
         {
             "PCDesktopClient",
             "MacDesktopClient",
@@ -119,15 +122,6 @@ namespace RobloxClientTracker
             { "U", GRAY    },
         };
 
-        static readonly ProcessStartInfo gitExecute = new ProcessStartInfo
-        {
-            FileName = "git",
-            CreateNoWindow = true,
-            UseShellExecute = false,
-            RedirectStandardError = true,
-            RedirectStandardOutput = true,
-        };
-
         static string branch = "roblox";
         static string parent = "roblox";
 
@@ -167,27 +161,37 @@ namespace RobloxClientTracker
 
         public static IEnumerable<string> git(params string[] args)
         {
-            Directory.SetCurrentDirectory(stageDir);
+            var cout = new List<string>();
+            var arguments = string.Join(' ', args);
 
-            string command = string.Join(" ", args);
-            Process git;
+            var command = Cli.Wrap("git")
+                .WithWorkingDirectory(stageDir)
+                .WithArguments(arguments);
 
-            lock (gitExecute)
+            var execute = Task.Run(async () =>
             {
-                gitExecute.Arguments = command;
-                git = Process.Start(gitExecute);
-            }
-
-            if (VERBOSE_GIT_LOGS)
-                print($"> git {command}");
-
-            List<string> outLines = new List<string>();
-
-            var processOutput = new Action<string, bool>((message, isError) =>
-            {
-                if (message != null && message.Length > 0)
+                if (VERBOSE_GIT_LOGS)
+                    print($"> git {arguments}");
+                
+                await foreach (var cmdEvent in command.ListenAsync())
                 {
-                    lock (outLines)
+                    bool isError = false;
+                    string message = null;
+
+                    switch (cmdEvent)
+                    {
+                        case StandardErrorCommandEvent stdErr:
+                            message = stdErr.Text;
+                            isError = true;
+                            break;
+                        case StandardOutputCommandEvent stdOut:
+                            message = stdOut.Text;
+                            break;
+
+                        default: break;
+                    }
+
+                    if (message != null)
                     {
                         if (VERBOSE_GIT_LOGS || isError)
                         {
@@ -195,25 +199,16 @@ namespace RobloxClientTracker
                             print(message, isError ? RED : WHITE);
                         }
 
-                        outLines.Add(message);
+                        cout.Add(message);
                     }
                 }
+
             });
 
-            git.ErrorDataReceived += new DataReceivedEventHandler
-                ((sender, evt) => processOutput(evt.Data, true));
-
-            git.OutputDataReceived += new DataReceivedEventHandler
-                ((sender, evt) => processOutput(evt.Data, false));
-            
-            git.BeginOutputReadLine();
-            git.BeginErrorReadLine();
-
-            git.WaitForExit();
-
-            return outLines;
+            execute.Wait();
+            return cout;
         }
-        
+
         static List<string> getChangedFiles(string branch, string filter)
         {
             var query = git("status", "-s");
@@ -240,11 +235,11 @@ namespace RobloxClientTracker
                 {
                     log("?", BLUE);
                 }
-                
+
                 print($" {file}", WHITE);
                 result.Add(file);
             }
-            
+
             return result;
         }
 
@@ -261,8 +256,8 @@ namespace RobloxClientTracker
 
             return (behind > 0);
         }
-        
-        static bool pushCommit(string label, string filter = ".")
+
+        static bool stageCommit(string label, string filter = ".")
         {
             print($"\t[{label}] Checking in files...", YELLOW);
             git($"add {filter}");
@@ -353,7 +348,7 @@ namespace RobloxClientTracker
                 git($"clone -c core.sshCommand=\"{sshCommand}\" {repoUrl} {stageDir}");
 
                 string name = settings.BotName;
-                git("config", "--local", "user.name", '"' + name + '"');
+                git("config", "--local", "user.name", $"\"{name}\"");
 
                 string email = settings.BotEmail;
                 git("config", "--local", "user.email", email);
@@ -373,7 +368,7 @@ namespace RobloxClientTracker
                 print("Syncing Roblox Studio...", GREEN);
                 await studio.UpdateStudio();
             }
-            
+
             // Copy some metadata generated during the studio installation.
             string studioDir = studio.GetStudioDirectory();
 
@@ -394,7 +389,7 @@ namespace RobloxClientTracker
 
                     throw new Exception(errorMsg);
                 }
-                
+
                 if (File.Exists(destination))
                     File.Delete(destination);
 
@@ -527,7 +522,6 @@ namespace RobloxClientTracker
                     }
 
                     // Check for updates to the version
-
                     ClientVersionInfo info = null;
 
                     if (MANUAL_BUILD)
@@ -550,7 +544,7 @@ namespace RobloxClientTracker
                     {
                         info = await StudioBootstrapper.GetCurrentVersionInfo(branch);
                     }
-                    
+
                     if (FORCE_UPDATE || MANUAL_BUILD || info.Guid != currentVersion)
                     {
                         print("Update detected!", YELLOW);
@@ -574,14 +568,14 @@ namespace RobloxClientTracker
                             string versionId = info.Version;
                             print("Creating commits...", YELLOW);
 
-                            bool didStagePackages = pushCommit($"{versionId} (Packages)", "*/_Index/*");
-                            bool didStageScripts = pushCommit($"{versionId} (Scripts)", "*.lua");
-                            bool didStageCore = pushCommit(versionId);
+                            bool didStagePackages = stageCommit($"{versionId} (Packages)", "*/_Index/*");
+                            bool didStageScripts = stageCommit($"{versionId} (Scripts)", "*.lua");
+                            bool didStageCore = stageCommit(versionId);
 
                             if (didStagePackages || didStageScripts || didStageCore)
                             {
-                                print($"Pushing to GitHub...", CYAN);
-                                git($"push");
+                                print("Pushing to GitHub...", CYAN);
+                                git("push");
 
                                 print("\tDone!", GREEN);
                             }
@@ -589,7 +583,7 @@ namespace RobloxClientTracker
                             currentVersion = info.Guid;
                             BranchRegistry.SetValue("Version", info.Guid);
                         }
-                        
+
                     }
                     else
                     {
@@ -602,6 +596,10 @@ namespace RobloxClientTracker
                 catch (Exception e)
                 {
                     print($"Exception Thrown: {e.Message}\n{e.StackTrace}\nTiming out for 1 minute.", RED);
+
+                    if (Debugger.IsAttached)
+                        Debugger.Break();
+
                     await Task.Delay(60000);
                 }
             }
@@ -669,7 +667,7 @@ namespace RobloxClientTracker
                                     if (lower == "true" || lower == "false")
                                         value = lower;
                                     else if (!int.TryParse(value, out testInt))
-                                        value = '"' + value + '"';
+                                        value = '"' + value.Replace("\"", "\\\"") + '"';
 
                                     result.Append($"\t\"{key}\": {value}");
                                 }
@@ -695,16 +693,26 @@ namespace RobloxClientTracker
                     }
 
                     await Task.WhenAll(taskPool);
-
                     string timeStamp = DateTime.Now.ToString();
-                    pushCommit(timeStamp);
 
+                    if (stageCommit(timeStamp))
+                    {
+                        print("Pushing to GitHub...", CYAN);
+                        git("push");
+
+                        print("\tDone!", GREEN);
+                    }
+                    
                     print($"Next update check in {UPDATE_FREQUENCY} minutes.", YELLOW);
                     await Task.Delay(UPDATE_FREQUENCY * 60000);
                 }
                 catch (Exception e)
                 {
                     print($"Exception Thrown: {e.Message}\n{e.StackTrace}\nTiming out for 1 minute.", RED);
+
+                    if (Debugger.IsAttached)
+                        Debugger.Break();
+
                     await Task.Delay(60000);
                 }
             }
@@ -779,7 +787,7 @@ namespace RobloxClientTracker
             trunk = createDirectory(@"C:\Roblox-Client-Tracker");
             stageDir = createDirectory(trunk, "stage", branch);
 
-            ServicePointManager.SecurityProtocol = SecurityProtocolType.Tls | SecurityProtocolType.Tls11 | SecurityProtocolType.Tls12 | SecurityProtocolType.Ssl3;
+            ServicePointManager.SecurityProtocol = SecurityProtocolType.Tls12;
             Task mainThread = null;
 
             if (TRACK_MODE == TrackMode.Client)
@@ -787,7 +795,20 @@ namespace RobloxClientTracker
             else if (TRACK_MODE == TrackMode.FastFlags)
                 mainThread = Task.Run(TrackFFlagsAsync);
 
-            mainThread?.Wait();
+            try
+            {
+                mainThread?.Wait();
+            }
+            catch (Exception e)
+            {
+                print($"An error occurred: {e.Message} {e.StackTrace}", RED);
+                Debugger.Break();
+            }
+            finally
+            {
+                print("Press any key to continue...", GRAY);
+                Console.Read();
+            }
         }
     }
 }

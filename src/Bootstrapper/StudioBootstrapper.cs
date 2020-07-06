@@ -311,102 +311,103 @@ namespace RobloxClientTracker
                 File.WriteAllBytes(zipExtractPath, fileContents);
             }
 
-            ZipArchive archive = ZipFile.OpenRead(zipExtractPath);
-            string localRootDir = null;
-
-            var reprocess = new Dictionary<ZipArchiveEntry, string>();
-
-            foreach (ZipArchiveEntry entry in archive.Entries)
+            using (ZipArchive archive = ZipFile.OpenRead(zipExtractPath))
             {
-                if (entry.Length > 0)
+                string localRootDir = null;
+                var reprocess = new Dictionary<ZipArchiveEntry, string>();
+
+                foreach (ZipArchiveEntry entry in archive.Entries)
                 {
-                    string newFileSig = null;
-
-                    // If we have figured out what our root directory is, try to resolve
-                    // what the signature of this file is.
-
-                    if (localRootDir != null)
+                    if (entry.Length > 0)
                     {
-                        string filePath = entry.FullName.Replace('/', '\\');
-                        bool hasFilePath = fileManifest.ContainsKey(filePath);
+                        string newFileSig = null;
 
-                        // If we can't find this file in the signature lookup table,
-                        // try appending the local directory to it. This resolves some
-                        // edge cases relating to the fixFilePath function above.
+                        // If we have figured out what our root directory is, try to resolve
+                        // what the signature of this file is.
 
-                        if (!hasFilePath)
+                        if (localRootDir != null)
                         {
-                            filePath = localRootDir + filePath;
-                            hasFilePath = fileManifest.ContainsKey(filePath);
+                            string filePath = entry.FullName.Replace('/', '\\');
+                            bool hasFilePath = fileManifest.ContainsKey(filePath);
+
+                            // If we can't find this file in the signature lookup table,
+                            // try appending the local directory to it. This resolves some
+                            // edge cases relating to the fixFilePath function above.
+
+                            if (!hasFilePath)
+                            {
+                                filePath = localRootDir + filePath;
+                                hasFilePath = fileManifest.ContainsKey(filePath);
+                            }
+
+                            // If we can find this file path in the file manifest, then we will
+                            // use its pre-computed signature to check if the file has changed.
+                            newFileSig = hasFilePath ? fileManifest[filePath] : null;
                         }
 
-                        // If we can find this file path in the file manifest, then we will
-                        // use its pre-computed signature to check if the file has changed.
-                        newFileSig = hasFilePath ? fileManifest[filePath] : null;
-                    }
+                        // If we couldn't pre-determine the file signature from the manifest,
+                        // then we have to compute it manually. This is slower.
 
-                    // If we couldn't pre-determine the file signature from the manifest,
-                    // then we have to compute it manually. This is slower.
+                        if (newFileSig == null)
+                            newFileSig = computeSignature(entry);
 
-                    if (newFileSig == null)
-                        newFileSig = computeSignature(entry);
+                        // Now check what files this signature corresponds with.
+                        var files = fileManifest
+                            .Where(pair => pair.Value == newFileSig)
+                            .Select(pair => pair.Key);
 
-                    // Now check what files this signature corresponds with.
-                    var files = fileManifest
-                        .Where(pair => pair.Value == newFileSig)
-                        .Select(pair => pair.Key);
-
-                    if (files.Count() > 0)
-                    {
-                        foreach (string file in files)
+                        if (files.Count() > 0)
                         {
-                            // Write the file from this signature.
-                            writePackageFile(studioDir, pkgName, file, newFileSig, entry);
-
-                            if (localRootDir == null)
+                            foreach (string file in files)
                             {
-                                string filePath = fixFilePath(pkgName, file);
-                                string entryPath = entry.FullName.Replace('/', '\\');
+                                // Write the file from this signature.
+                                writePackageFile(studioDir, pkgName, file, newFileSig, entry);
 
-                                if (filePath.EndsWith(entryPath))
+                                if (localRootDir == null)
                                 {
-                                    // We can infer what the root extraction  
-                                    // directory is for the files in this package!                                 
-                                    localRootDir = filePath.Replace(entryPath, "");
+                                    string filePath = fixFilePath(pkgName, file);
+                                    string entryPath = entry.FullName.Replace('/', '\\');
+
+                                    if (filePath.EndsWith(entryPath))
+                                    {
+                                        // We can infer what the root extraction  
+                                        // directory is for the files in this package!                                 
+                                        localRootDir = filePath.Replace(entryPath, "");
+                                    }
                                 }
                             }
                         }
-                    }
-                    else
-                    {
-                        string file = entry.FullName;
-
-                        if (localRootDir == null)
-                        {
-                            // Check back on this file after we extract the regular files,
-                            // so we can make sure this is extracted to the correct directory.
-                            reprocess.Add(entry, newFileSig);
-                        }
                         else
                         {
-                            // Append the local root directory.
-                            file = localRootDir + file;
-                            writePackageFile(studioDir, pkgName, file, newFileSig, entry);
+                            string file = entry.FullName;
+
+                            if (localRootDir == null)
+                            {
+                                // Check back on this file after we extract the regular files,
+                                // so we can make sure this is extracted to the correct directory.
+                                reprocess.Add(entry, newFileSig);
+                            }
+                            else
+                            {
+                                // Append the local root directory.
+                                file = localRootDir + file;
+                                writePackageFile(studioDir, pkgName, file, newFileSig, entry);
+                            }
                         }
                     }
                 }
-            }
 
-            // Process any files that we deferred from writing immediately.
-            foreach (ZipArchiveEntry entry in reprocess.Keys)
-            {
-                string file = entry.FullName;
-                string newFileSig = reprocess[entry];
+                // Process any files that we deferred from writing immediately.
+                foreach (ZipArchiveEntry entry in reprocess.Keys)
+                {
+                    string file = entry.FullName;
+                    string newFileSig = reprocess[entry];
 
-                if (localRootDir != null)
-                    file = localRootDir + file;
+                    if (localRootDir != null)
+                        file = localRootDir + file;
 
-                writePackageFile(studioDir, pkgName, file, newFileSig, entry);
+                    writePackageFile(studioDir, pkgName, file, newFileSig, entry);
+                }
             }
 
             // Update the signature in the package registry so we can check

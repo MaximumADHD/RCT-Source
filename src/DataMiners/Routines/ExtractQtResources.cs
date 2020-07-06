@@ -77,18 +77,21 @@ namespace RobloxClientTracker
 
             print("Extracting Qt Resources...");
 
-            Process process = Process.Start(extract);
-            process.WaitForExit();
-
-            foreach (string file in Directory.GetFiles(extractDir, "*.xml", SearchOption.AllDirectories))
+            using (Process process = Process.Start(extract))
             {
-                FileInfo info = new FileInfo(file);
-                string newPath = Path.Combine(stageDir, info.Name);
+                process.WaitForExit();
+                process.Close();
 
-                if (File.Exists(newPath))
-                    File.Delete(newPath);
+                foreach (string file in Directory.GetFiles(extractDir, "*.xml", SearchOption.AllDirectories))
+                {
+                    FileInfo info = new FileInfo(file);
+                    string newPath = Path.Combine(stageDir, info.Name);
 
-                File.Move(file, newPath);
+                    if (File.Exists(newPath))
+                        File.Delete(newPath);
+
+                    File.Move(file, newPath);
+                }
             }
         }
     }

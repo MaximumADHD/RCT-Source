@@ -44,6 +44,17 @@ namespace RobloxClientTracker
 
                 File.Delete(file);
             }
+
+            foreach (string folder in Directory.GetDirectories(destFolder))
+            {
+                var info = new DirectoryInfo(folder);
+                string file = Path.Combine(srcFolder, info.Name + ".rbxm");
+
+                if (File.Exists(file))
+                    continue;
+
+                Directory.Delete(folder, true);
+            }
         }
     }
 }

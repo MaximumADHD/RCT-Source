@@ -29,66 +29,73 @@ namespace RobloxClientTracker
 
             print("Starting FFlag scan...");
 
-            Process update = Process.Start(new ProcessStartInfo()
+            var startInfo = new ProcessStartInfo()
             {
                 FileName = studioPath,
                 Arguments = $"-startEvent {start.Name} -showEvent {show.Name}"
-            });
+            };
 
-            print("\tWaiting for signal from studio...");
-            start.WaitOne();
-
-            int timeOut = 0;
-            const int numTries = 32;
-
-            print("\tWaiting for StudioAppSettings.json to be written...");
-            FileInfo info = new FileInfo(settingsPath);
-
-            while (timeOut < numTries)
+            using (Process update = Process.Start(startInfo))
             {
-                info.Refresh();
+                print("\tWaiting for signal from studio...");
+                start.WaitOne();
 
-                if (info.Length > 0)
+                int timeOut = 0;
+                const int numTries = 32;
+
+                print("\tWaiting for StudioAppSettings.json to be written...");
+                FileInfo info = new FileInfo(settingsPath);
+
+                while (timeOut < numTries)
                 {
+                    info.Refresh();
+
+                    if (info.Length > 0)
+                    {
+                        update.Kill();
+                        break;
+                    }
+
+                    print($"\t\t({++timeOut}/{numTries} tries until giving up...)");
+
+                    var delay = Task.Delay(30);
+                    delay.Wait();
+                }
+
+                if (info.Length == 0)
+                {
+                    print("FAST FLAG EXTRACTION FAILED!", ConsoleColor.Red);
+
+                    update.Close();
                     update.Kill();
-                    break;
+
+                    return;
                 }
 
-                print($"\t\t({++timeOut}/{numTries} tries until giving up...)");
+                var file = File.ReadAllText(settingsPath);
+                var flags = new List<string>();
 
-                var delay = Task.Delay(30);
-                delay.Wait();
-            }
-
-            if (info.Length == 0)
-            {
-                print("FAST FLAG EXTRACTION FAILED!", ConsoleColor.Red);
-                update.Kill();
-                return;
-            }
-
-            string file = File.ReadAllText(settingsPath);
-            var flags = new List<string>();
-
-            using (var jsonText = new StringReader(file))
-            {
-                var reader = new JsonTextReader(jsonText);
-                var flagData = JObject.Load(reader);
-
-                foreach (var pair in flagData)
+                using (var jsonText = new StringReader(file))
                 {
-                    string flagName = pair.Key;
-                    flags.Add(flagName);
+                    var reader = new JsonTextReader(jsonText);
+                    var flagData = JObject.Load(reader);
+
+                    foreach (var pair in flagData)
+                    {
+                        string flagName = pair.Key;
+                        flags.Add(flagName);
+                    }
                 }
+
+                flags.Sort();
+                print("Flag Scan completed!");
+
+                string flagsPath = Path.Combine(stageDir, "FVariables.txt");
+                string result = string.Join("\r\n", flags);
+
+                writeFile(flagsPath, result);
+                update.Close();
             }
-
-            flags.Sort();
-            print("Flag Scan completed!");
-
-            string flagsPath = Path.Combine(stageDir, "FVariables.txt");
-            string result = string.Join("\r\n", flags);
-
-            writeFile(flagsPath, result);
         }
     }
 }
