@@ -5,6 +5,7 @@ using System.IO;
 using System.Text.RegularExpressions;
 
 using Microsoft.Win32;
+using RobloxFiles.BinaryFormat.Chunks;
 
 namespace RobloxClientTracker
 {
@@ -28,36 +29,48 @@ namespace RobloxClientTracker
         public ShaderType ShaderType;
         public string Group;
 
-        public byte[] Buffer;
         public byte[] Stub;
+        public byte[] Buffer;
+
+        public int Level = 0;
+
+        public string Id
+        {
+            get
+            {
+                string level = "";
+
+                if (Name.EndsWith('_'))
+                    level = $"Level{Level}";
+
+                return $"{Name}{level}";
+            }
+        }
 
         public override string ToString()
         {
             string Type = Enum.GetName(typeof(ShaderType), ShaderType);
-            return $"[{Type}] {Name}";
+            return $"[{Type}] {Id}";
         }
 
         public string RegistryKey
         {
-            get { return $"{Group}/{Name}"; }
+            get { return $"{Group}/{Id}"; }
         }
 
         public int CompareTo(object obj)
         {
-            int result;
-            string value = ToString();
-
             if (obj is ShaderFile)
             {
                 ShaderFile other = (ShaderFile)obj;
-                result = Name.CompareTo(other.Name);
-            }
-            else
-            {
-                result = Name.CompareTo(obj);
+
+                if (Name == other.Name && Level != other.Level)
+                    return Level - other.Level;
+                
+                return Id.CompareTo(other.Id);
             }
 
-            return result;
+            return Id.CompareTo(obj);
         }
 
         public void WriteFile(UnpackShaders unpacker, string dir, RegistryKey container)
@@ -72,14 +85,12 @@ namespace RobloxClientTracker
                     .Substring(0, 4)
                     .ToLower();
 
-                string shaderPath = Path.Combine(dir, Name + '.' + extension);
-                var writtenHeaders = new HashSet<string>();
+                string shaderPath = Path.Combine(dir, Id + '.' + extension);
                 var names = new List<int>();
 
                 Regex variables = new Regex("_([0-9]+)");
                 Regex structs = new Regex("struct ([A-z]+)\n{[^}]+};\n\n");
                 
-
                 foreach (var variable in variables.Matches(contents))
                 {
                     string str = variable

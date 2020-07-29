@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.IO;
 using System.Linq;
 
@@ -55,19 +56,27 @@ namespace RobloxClientTracker
                     byte[] rawHash = reader.ReadBytes(16);
                     string hash = Convert.ToBase64String(rawHash);
 
-                    Shaders[i] = new ShaderFile
+                    var shader = new ShaderFile
                     {
                         Name = name,
                         Hash = hash,
 
                         Offset = reader.ReadInt32(),
                         Size = reader.ReadInt32(),
-
-                        ShaderType = (ShaderType)reader.ReadByte(),
-                        Group = Groups[reader.ReadByte()],
-
-                        Stub = reader.ReadBytes(6),
                     };
+
+                    if (Version > 6)
+                        shader.Level = reader.ReadInt32();
+
+                    shader.ShaderType = (ShaderType)reader.ReadByte();
+                    shader.Group = Groups[reader.ReadByte()];
+
+                    if (Version > 6)
+                        shader.Stub = reader.ReadBytes(2);
+                    else
+                        shader.Stub = reader.ReadBytes(6);
+
+                    Shaders[i] = shader;
                 }
 
                 // Unpack the shader files

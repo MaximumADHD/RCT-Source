@@ -165,44 +165,52 @@ namespace RobloxClientTracker
             var arguments = string.Join(' ', args);
 
             var command = Cli.Wrap("git")
+                .WithValidation(CommandResultValidation.None)
                 .WithWorkingDirectory(stageDir)
                 .WithArguments(arguments);
-
+            
             var execute = Task.Run(async () =>
             {
                 if (VERBOSE_GIT_LOGS)
                     print($"> git {arguments}");
                 
-                await foreach (var cmdEvent in command.ListenAsync())
+                try
                 {
-                    bool isError = false;
-                    string message = null;
-
-                    switch (cmdEvent)
+                    await foreach (var cmdEvent in command.ListenAsync())
                     {
-                        case StandardErrorCommandEvent stdErr:
-                            message = stdErr.Text;
-                            isError = true;
-                            break;
-                        case StandardOutputCommandEvent stdOut:
-                            message = stdOut.Text;
-                            break;
+                        bool isError = false;
+                        string message = null;
 
-                        default: break;
-                    }
-
-                    if (message != null)
-                    {
-                        if (VERBOSE_GIT_LOGS || isError)
+                        switch (cmdEvent)
                         {
-                            log("[git] ", MAGENTA);
-                            print(message, isError ? RED : WHITE);
+                            case StandardErrorCommandEvent stdErr:
+                                message = stdErr.Text;
+                                isError = true;
+                                break;
+                            case StandardOutputCommandEvent stdOut:
+                                message = stdOut.Text;
+                                break;
+
+                            default: break;
                         }
 
-                        cout.Add(message);
+                        if (message != null)
+                        {
+                            if (VERBOSE_GIT_LOGS || isError)
+                            {
+                                log("[git] ", MAGENTA);
+                                print(message, isError ? RED : WHITE);
+                            }
+
+                            cout.Add(message);
+                        }
                     }
                 }
-
+                catch (Exception e)
+                {
+                    print($"An error occurred while executing 'git {arguments}'!", RED);
+                    print($"{e.Message} {e.StackTrace}", RED);
+                }
             });
 
             execute.Wait();
