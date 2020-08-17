@@ -26,9 +26,8 @@ namespace RobloxClientTracker
             resetDirectory(dir);
 
             using (var stream = new MemoryStream(Resources.LuaJIT_zip))
+            using (var luaJit = new ZipArchive(stream, ZipArchiveMode.Read))
             {
-                ZipArchive luaJit = new ZipArchive(stream, ZipArchiveMode.Read);
-
                 foreach (ZipArchiveEntry entry in luaJit.Entries)
                 {
                     string fullPath = Path.Combine(dir, entry.FullName);

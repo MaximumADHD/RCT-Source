@@ -8,17 +8,20 @@ namespace RobloxClientTracker
 {
     public class ShaderPack
     {
-        public string Name;
-        public int Hash;
+        public string Name { get; private set; }
+        public int Hash { get; private set; }
 
-        public string Header;
-        public int Version;
+        public string Header { get; private set; }
+        public int Version { get; private set; }
 
-        public short NumGroups;
-        public short NumShaders;
+        public short NumGroups { get; private set; }
+        public short NumShaders { get; private set; }
 
-        public string[] Groups;
-        public ShaderFile[] Shaders;
+        private string[] GroupsImpl;
+        private ShaderFile[] ShadersImpl;
+
+        public IReadOnlyList<string> Groups => GroupsImpl;
+        public IReadOnlyList<ShaderFile> Shaders => ShadersImpl;
 
         public override string ToString()
         {
@@ -41,12 +44,12 @@ namespace RobloxClientTracker
                 Name = info.Name.Replace(info.Extension, "");
                 Hash = reader.ReadInt32();
 
-                Groups = new string[NumGroups];
-                Shaders = new ShaderFile[NumShaders];
+                GroupsImpl = new string[NumGroups];
+                ShadersImpl = new ShaderFile[NumShaders];
 
                 // Read Groups
                 for (int i = 0; i < NumGroups; i++)
-                    Groups[i] = reader.ReadString(64);
+                    GroupsImpl[i] = reader.ReadString(64);
 
                 // Read Shaders
                 for (int i = 0; i < NumShaders; i++)
@@ -76,7 +79,7 @@ namespace RobloxClientTracker
                     else
                         shader.Stub = reader.ReadBytes(6);
 
-                    Shaders[i] = shader;
+                    ShadersImpl[i] = shader;
                 }
 
                 // Unpack the shader files
@@ -151,6 +154,9 @@ namespace RobloxClientTracker
 
             if (shaderReg.GetValueNames().Length == 0)
                 shaderManifest.DeleteSubKey(shaderKey);
+
+            shaderReg.Dispose();
+            shaderManifest.Dispose();
 
             return hashes;
         }

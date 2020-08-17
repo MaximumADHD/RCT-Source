@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Diagnostics;
+using System.Globalization;
 using System.IO;
 using System.IO.Compression;
 using System.Linq;
@@ -52,17 +53,16 @@ namespace RobloxClientTracker
 
         private static string computeSignature(Stream source)
         {
-            string result;
-
             using (MD5 md5 = MD5.Create())
             {
                 byte[] hash = md5.ComputeHash(source);
-                result = BitConverter.ToString(hash)
-                    .Replace("-", "")
-                    .ToLower();
-            }
 
-            return result;
+                string result = BitConverter.ToString(hash)
+                    .Replace("-", "", StringComparison.InvariantCulture)
+                    .ToLower(CultureInfo.InvariantCulture);
+
+                return result;
+            }
         }
 
         private static string computeSignature(ZipArchiveEntry entry)
@@ -222,7 +222,7 @@ namespace RobloxClientTracker
             if (branch == "roblox")
                 return await ClientVersionInfo.Get(binaryType);
 
-            if (fastGuid == "")
+            if (string.IsNullOrEmpty(fastGuid))
                 fastGuid = await GetFastVersionGuid(branch);
 
             var info = new ClientVersionInfo();
@@ -356,7 +356,7 @@ namespace RobloxClientTracker
                             .Where(pair => pair.Value == newFileSig)
                             .Select(pair => pair.Key);
 
-                        if (files.Count() > 0)
+                        if (files.Any())
                         {
                             foreach (string file in files)
                             {
@@ -413,6 +413,7 @@ namespace RobloxClientTracker
             // Update the signature in the package registry so we can check
             // if this zip file needs to be updated in future versions.
             pkgRegistry.SetValue(pkgName, package.Signature);
+            localHttp.Dispose();
         }
 
         private void writePackageFile(string studioDir, string pkgName, string file, string newFileSig, ZipArchiveEntry entry)

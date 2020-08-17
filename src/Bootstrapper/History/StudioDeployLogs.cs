@@ -1,4 +1,5 @@
 ﻿using System.Collections.Generic;
+using System.Globalization;
 using System.Linq;
 using System.Text.RegularExpressions;
 using System.Threading.Tasks;
@@ -14,8 +15,10 @@ namespace RobloxClientTracker
         private string LastDeployHistory = "";
         private static Dictionary<string, StudioDeployLogs> LogCache = new Dictionary<string, StudioDeployLogs>();
 
-        public HashSet<DeployLog> CurrentLogs_x86 = new HashSet<DeployLog>();
-        public HashSet<DeployLog> CurrentLogs_x64 = new HashSet<DeployLog>();
+        public HashSet<DeployLog> CurrentLogs_x86 { get; private set; } = new HashSet<DeployLog>();
+        public HashSet<DeployLog> CurrentLogs_x64 { get; private set; } = new HashSet<DeployLog>();
+
+        private static readonly CultureInfo invariant = CultureInfo.InvariantCulture;
 
         private StudioDeployLogs(string branch)
         {
@@ -38,14 +41,14 @@ namespace RobloxClientTracker
 
                 DeployLog deployLog = new DeployLog()
                 {
-                    BuildType = data[1],
-                    VersionGuid = data[2]
-                };
+                    BuildType   = data[1],
+                    VersionGuid = data[2],
 
-                int.TryParse(data[3], out deployLog.MajorRev);
-                int.TryParse(data[4], out deployLog.Version);
-                int.TryParse(data[5], out deployLog.Patch);
-                int.TryParse(data[6], out deployLog.Changelist);
+                    MajorRev    = int.Parse(data[3], invariant),
+                    Version     = int.Parse(data[4], invariant),
+                    Patch       = int.Parse(data[5], invariant),
+                    Changelist  = int.Parse(data[6], invariant)
+                };
 
                 HashSet<DeployLog> targetList;
 
@@ -60,7 +63,7 @@ namespace RobloxClientTracker
 
         public static async Task<StudioDeployLogs> Get(string branch, bool refresh = false)
         {
-            StudioDeployLogs logs = null;
+            StudioDeployLogs logs;
             bool init = !LogCache.ContainsKey(branch);
 
             if (init)
@@ -69,7 +72,7 @@ namespace RobloxClientTracker
                 logs = LogCache[branch];
 
             string deployHistory = await HistoryCache.GetDeployHistory(branch, init || refresh);
-
+            
             if (init || refresh)
             {
                 logs.LastDeployHistory = deployHistory;

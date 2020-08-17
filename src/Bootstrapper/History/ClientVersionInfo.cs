@@ -9,8 +9,8 @@ namespace RobloxClientTracker
 {
     public class ClientVersionInfo
     {
-        public string Version;
-        public string Guid;
+        public string Version { get; set; }
+        public string Guid    { get; set; }
 
         public static async Task<ClientVersionInfo> Get(string buildType = "WindowsStudio", string branch = "roblox")
         {
@@ -20,10 +20,10 @@ namespace RobloxClientTracker
             using (WebClient http = new WebClient())
             {
                 string json = await http.DownloadStringTaskAsync(jsonUrl);
-
-                using (StringReader jsonText = new StringReader(json))
+                
+                using (var jsonText = new StringReader(json))
+                using (var reader = new JsonTextReader(jsonText))
                 {
-                    var reader = new JsonTextReader(jsonText);
                     JObject jsonData = JObject.Load(reader);
 
                     versionInfo.Version = jsonData.Value<string>("version");

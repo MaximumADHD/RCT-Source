@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Diagnostics;
+using System.Globalization;
 using System.IO;
 using System.Text.RegularExpressions;
 
@@ -20,19 +21,19 @@ namespace RobloxClientTracker
     {
         private const string extendGL = "#extension GL_ARB_shading_language_include : require";
 
-        public string Name;
-        public string Hash;
+        public string Name { get; set; }
+        public string Hash { get; set; }
 
-        public int Offset;
-        public int Size;
+        public int Offset { get; set; }
+        public int Size { get; set; }
 
-        public ShaderType ShaderType;
-        public string Group;
+        public ShaderType ShaderType { get; set; }
+        public string Group { get; set; }
 
         public byte[] Stub;
         public byte[] Buffer;
 
-        public int Level = 0;
+        public int Level { get; set; }
 
         public string Id
         {
@@ -62,15 +63,15 @@ namespace RobloxClientTracker
         {
             if (obj is ShaderFile)
             {
-                ShaderFile other = (ShaderFile)obj;
+                var other = obj as ShaderFile;
 
                 if (Name == other.Name && Level != other.Level)
                     return Level - other.Level;
-                
-                return Id.CompareTo(other.Id);
+
+                return string.Compare(Id, other.Id, StringComparison.InvariantCulture);
             }
 
-            return Id.CompareTo(obj);
+            return string.Compare(Id, obj?.ToString(), StringComparison.InvariantCulture);
         }
 
         public void WriteFile(UnpackShaders unpacker, string dir, RegistryKey container)
@@ -83,7 +84,7 @@ namespace RobloxClientTracker
 
                 string extension = Enum.GetName(enumType, ShaderType)
                     .Substring(0, 4)
-                    .ToLower();
+                    .ToLower(CultureInfo.InvariantCulture);
 
                 string shaderPath = Path.Combine(dir, Id + '.' + extension);
                 var names = new List<int>();
@@ -97,7 +98,7 @@ namespace RobloxClientTracker
                         .ToString()
                         .Substring(1);
 
-                    int value = int.Parse(str);
+                    int value = int.Parse(str, CultureInfo.InvariantCulture);
                     string name = extension.Substring(0, 1);
 
                     if (!names.Contains(value))

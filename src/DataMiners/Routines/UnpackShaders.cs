@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Diagnostics;
+using System.Globalization;
 using System.IO;
 using System.Linq;
 
@@ -19,7 +20,7 @@ namespace RobloxClientTracker
             Stack = 2
         };
 
-        public string ResetDirectory(params string[] traversal) => resetDirectory(traversal);
+        public static string ResetDirectory(params string[] traversal) => resetDirectory(traversal);
         public void WriteShader(string path, string contents) => writeFile(path, contents, LogShader);
 
         public bool HasHeaderFile(string header) => writtenHeaders.Contains(header);
@@ -94,7 +95,7 @@ namespace RobloxClientTracker
                 }
 
                 string[] myManifestLines = myLines
-                    .Select(line => line.ToString())
+                    .Select(line => line.ToString(CultureInfo.InvariantCulture))
                     .ToArray();
 
                 string myManifest = string.Join("\r\n", myManifestLines);

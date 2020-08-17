@@ -17,9 +17,11 @@ using Newtonsoft.Json.Linq;
 using CliWrap;
 using CliWrap.EventStream;
 
+#pragma warning disable CA1303 // Do not pass literals as localized parameters
+
 namespace RobloxClientTracker
 {
-    public class Program
+    static class Program
     {
         public enum TrackMode
         {
@@ -217,7 +219,7 @@ namespace RobloxClientTracker
             return cout;
         }
 
-        static List<string> getChangedFiles(string branch, string filter)
+        static List<string> getChangedFiles(string filter)
         {
             var query = git("status", "-s");
             var result = new List<string>();
@@ -271,7 +273,7 @@ namespace RobloxClientTracker
             git($"add {filter}");
 
             // Verify this update is worth committing.
-            var files = getChangedFiles(branch, filter);
+            var files = getChangedFiles(filter);
 
             int updateCount = 0;
             int boringCount = 0;
@@ -667,7 +669,7 @@ namespace RobloxClientTracker
                                     string key = keys[i];
 
                                     string value = appSettings.Value<string>(key);
-                                    string lower = value.ToLower();
+                                    string lower = value.ToLowerInvariant();
 
                                     if (i != 0)
                                         result.Append(",\r\n");
@@ -675,7 +677,7 @@ namespace RobloxClientTracker
                                     if (lower == "true" || lower == "false")
                                         value = lower;
                                     else if (!int.TryParse(value, out testInt))
-                                        value = '"' + value.Replace("\"", "\\\"") + '"';
+                                        value = '"' + value.Replace("\"", "\\\"", StringComparison.InvariantCulture) + '"';
 
                                     result.Append($"\t\"{key}\": {value}");
                                 }
@@ -733,21 +735,21 @@ namespace RobloxClientTracker
 
             foreach (string arg in args)
             {
-                if (arg.StartsWith("-"))
+                if (arg.StartsWith("-", StringComparison.InvariantCulture))
                 {
-                    if (argKey != "")
+                    if (!string.IsNullOrEmpty(argKey))
                         argMap.Add(argKey, "");
 
                     argKey = arg;
                 }
-                else if (argKey != "")
+                else if (!string.IsNullOrEmpty(argKey))
                 {
                     argMap.Add(argKey, arg);
                     argKey = "";
                 }
             }
 
-            if (argKey != "")
+            if (!string.IsNullOrEmpty(argKey))
                 argMap.Add(argKey, "");
 
             if (argMap.ContainsKey(ARG_BRANCH))
@@ -772,13 +774,15 @@ namespace RobloxClientTracker
                 MANUAL_BUILD = true;
 
             if (argMap.ContainsKey(ARG_UPDATE_FREQUENCY))
-                int.TryParse(argMap[ARG_UPDATE_FREQUENCY], out UPDATE_FREQUENCY);
+                if (!int.TryParse(argMap[ARG_UPDATE_FREQUENCY], out UPDATE_FREQUENCY))
+                    print($"Bad {ARG_UPDATE_FREQUENCY} provided.", RED);
 
             if (argMap.ContainsKey(ARG_FORCE_VERSION_GUID))
                 FORCE_VERSION_GUID = argMap[ARG_FORCE_VERSION_GUID];
 
             if (argMap.ContainsKey(ARG_TRACK_MODE))
-                Enum.TryParse(argMap[ARG_TRACK_MODE], out TRACK_MODE);
+                if (!Enum.TryParse(argMap[ARG_TRACK_MODE], out TRACK_MODE))
+                    print($"Bad {ARG_TRACK_MODE} provided.", RED);
 
             if (TRACK_MODE == TrackMode.FastFlags)
             {

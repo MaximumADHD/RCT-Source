@@ -43,7 +43,7 @@ namespace RobloxClientTracker
             string[] headers = new string[3] { "Key", "Source", "Context" }
                 .Select(header => entryType.GetField(header))
                 .Where(field => this
-                    .Any(entry => field.GetValue(entry) as string != ""))
+                    .Any(entry => !string.IsNullOrEmpty(field.GetValue(entry) as string)))
                 .Select(field => field.Name)
                 .Concat(languages)
                 .ToArray();

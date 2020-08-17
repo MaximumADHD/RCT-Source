@@ -46,7 +46,7 @@ namespace RobloxClientTracker
 
         protected static string sanitizeString(string str)
         {
-            string sanitized = str
+            string sanitized = str?
                 .Replace("\r\r", "\r")
                 .Replace("\n", "\r\n")
                 .Replace("\r\r", "\r");

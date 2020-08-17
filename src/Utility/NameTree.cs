@@ -1,22 +1,15 @@
 ﻿using System.Collections.Generic;
 using System.Linq;
 using System.Text;
+using System;
 
 namespace RobloxClientTracker
 {
     public class NameTree : Dictionary<string, NameTree>
     {
         public string Name { get; private set; }
+        public bool Invalid => int.TryParse(Name, out _);
 
-        public bool Invalid
-        {
-            get
-            {
-                int test;
-                return int.TryParse(Name, out test);
-            }
-        }
-        
         public NameTree(string name)
         {
             Name = name;
@@ -38,14 +31,14 @@ namespace RobloxClientTracker
             int sizeofA = a.GetBranches().Count;
             int sizeofB = b.GetBranches().Count;
 
-            int result = 0;
+            int result;
 
             if (sizeofA == 0 && sizeofB > 0)
                 result = 1;
             else if (sizeofB == 0 && sizeofA > 0)
                 result = -1;
             else
-                result = string.Compare(a.Name, b.Name);
+                result = string.Compare(a.Name, b.Name, StringComparison.InvariantCulture);
 
             return result;
         }

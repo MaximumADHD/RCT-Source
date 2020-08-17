@@ -1,6 +1,7 @@
 ﻿using System;
 using System.IO;
 using System.Linq;
+using System.Diagnostics.Contracts;
 
 using RobloxFiles;
 using Microsoft.Win32;
@@ -43,7 +44,7 @@ namespace RobloxClientTracker
 
         public static bool PullInstanceData(Instance inst, ref string value, ref string extension)
         {
-            string name = inst.Name;
+            Contract.Requires(inst != null);
 
             if (inst.IsA<LuaSourceContainer>())
             {
@@ -141,7 +142,6 @@ namespace RobloxClientTracker
                     }
                 }
 
-                string projectDir = resetDirectory(info.DirectoryName, projectName);
                 Instance[] children = file.GetChildren();
 
                 if (children.Length == 1)
