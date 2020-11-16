@@ -42,6 +42,11 @@ namespace RobloxClientTracker
             [In]  [MarshalAs(UnmanagedType.U4)] UnDecorateFlags Flags
         );
 
+        static IReadOnlyDictionary<string, string> TypeSimplify = new Dictionary<string, string>()
+        {
+            { "std::basic_string<char,struct std::char_traits<char>,class std::allocator<char> >", "std::string" }
+        };
+
         public override ConsoleColor LogColor => ConsoleColor.Magenta;
         private string studioExe;
 
@@ -112,17 +117,25 @@ namespace RobloxClientTracker
             var classes = hackOutPattern(studioExe, "(AV|AW4)[A-z0-9_@\\?\\$]+");
             var lines = new List<string>();
 
-            foreach (string linkerChunk in classes)
+            foreach (string symbol in classes)
             {
-                if (linkerChunk.Length > 8 && linkerChunk.ToLower().EndsWith("rbx@@"))
+                string data = '?' + symbol;
+
+                if (data.ToUpperInvariant().EndsWith("@@"))
                 {
                     StringBuilder output = new StringBuilder(8192);
-                    UnDecorateSymbolName("?" + linkerChunk, output, 8192, UnDecorateFlags.UNDNAME_NO_ARGUMENTS);
+                    UnDecorateSymbolName(data, output, 8192, UnDecorateFlags.UNDNAME_NO_ARGUMENTS | UnDecorateFlags.UNDNAME_NO_LEADING_UNDERSCORES);
 
                     string result = output.ToString();
 
-                    if (result == "?" + linkerChunk)
+                    if (result == data)
                         continue;
+
+                    foreach (string complex in TypeSimplify.Keys)
+                    {
+                        string simple = TypeSimplify[complex];
+                        result = result.Replace(complex, simple);
+                    }
 
                     lines.Add(result.Substring(6));
                 }
