@@ -29,6 +29,12 @@ namespace RobloxClientTracker
                     versionInfo.Version = jsonData.Value<string>("version");
                     versionInfo.Guid = jsonData.Value<string>("clientVersionUpload");
 
+                    if (!string.IsNullOrEmpty(Program.FORCE_VERSION_GUID))
+                        versionInfo.Guid = Program.FORCE_VERSION_GUID;
+
+                    if (!string.IsNullOrEmpty(Program.FORCE_VERSION_ID))
+                        versionInfo.Version = Program.FORCE_VERSION_ID;
+
                     return versionInfo;
                 }
             }

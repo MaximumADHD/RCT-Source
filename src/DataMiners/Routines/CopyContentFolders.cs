@@ -10,6 +10,7 @@ namespace RobloxClientTracker
         private string[] contentFolders = new string[]
         {
             "avatar",
+            "configs",
             "scripts",
             "LuaPackages",
             "translations"

@@ -37,12 +37,16 @@ namespace RobloxClientTracker
         const string ARG_BRANCH = "-branch";
         const string ARG_PARENT = "-parent";
         const string ARG_TRACK_MODE = "-trackMode";
+
         const string ARG_FORCE_REBASE = "-forceRebase";
         const string ARG_FORCE_UPDATE = "-forceUpdate";
         const string ARG_FORCE_COMMIT = "-forceCommit";
         const string ARG_MANUAL_BUILD = "-manualBuild";
+
         const string ARG_VERBOSE_GIT_LOGS = "-verboseGitLogs";
         const string ARG_UPDATE_FREQUENCY = "-updateFrequency";
+
+        const string ARG_FORCE_VERSION_ID = "-forceVersionId";
         const string ARG_FORCE_VERSION_GUID = "-forceVersionGuid";
 
         public const ConsoleColor DARK_YELLOW = ConsoleColor.DarkYellow;
@@ -555,6 +559,12 @@ namespace RobloxClientTracker
                         info = await StudioBootstrapper.GetCurrentVersionInfo(branch);
                     }
 
+                    if (!string.IsNullOrEmpty(FORCE_VERSION_ID))
+                        info.Version = FORCE_VERSION_ID;
+
+                    if (!string.IsNullOrEmpty(FORCE_VERSION_GUID))
+                        info.Guid = FORCE_VERSION_GUID;
+
                     if (FORCE_UPDATE || MANUAL_BUILD || info.Guid != currentVersion)
                     {
                         print("Update detected!", YELLOW);
@@ -776,6 +786,9 @@ namespace RobloxClientTracker
             if (argMap.ContainsKey(ARG_UPDATE_FREQUENCY))
                 if (!int.TryParse(argMap[ARG_UPDATE_FREQUENCY], out UPDATE_FREQUENCY))
                     print($"Bad {ARG_UPDATE_FREQUENCY} provided.", RED);
+
+            if (argMap.ContainsKey(ARG_FORCE_VERSION_ID))
+                FORCE_VERSION_ID = argMap[ARG_FORCE_VERSION_ID];
 
             if (argMap.ContainsKey(ARG_FORCE_VERSION_GUID))
                 FORCE_VERSION_GUID = argMap[ARG_FORCE_VERSION_GUID];
