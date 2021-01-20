@@ -138,8 +138,7 @@ namespace RobloxClientTracker
         public static StudioBootstrapper studio { get; private set; }
 
         static Dictionary<string, string> argMap = new Dictionary<string, string>();
-        const string fflagEndpoint = "https://clientsettingscdn.roblox.com/v1/settings/application?applicationName=";
-
+        
         public static void print(string message, ConsoleColor color = GRAY)
         {
             Console.ForegroundColor = color;
@@ -373,67 +372,47 @@ namespace RobloxClientTracker
             return false;
         }
 
-        static async Task<bool> updateClientTrackerStage(ClientVersionInfo info, IEnumerable<DataMiner> miners)
+        static async Task startRoutineLoop(Func<Task> routine)
         {
-            // Make sure Roblox Studio is up to date for this build.
-
-            if (!MANUAL_BUILD)
+            print("Main thread starting!", MAGENTA);
+            
+            while (true)
             {
-                print("Syncing Roblox Studio...", GREEN);
-                await studio.UpdateStudio();
-            }
-
-            // Copy some metadata generated during the studio installation.
-            string studioDir = studio.GetStudioDirectory();
-
-            foreach (string fileName in filesToCopy)
-            {
-                string sourcePath = Path.Combine(studioDir, fileName);
-                string destination = Path.Combine(stageDir, fileName);
-
-                if (!File.Exists(sourcePath))
+                bool timeout = false;
+                print("Checking for updates...", CYAN);
+                
+                try
                 {
-                    string errorMsg = $"Missing file to copy: {sourcePath}!!";
+                    await Task.Run(routine);
+                    print($"Next update check in {UPDATE_FREQUENCY} minutes.", YELLOW);
+                    await Task.Delay(UPDATE_FREQUENCY * 60000);
+                }
+                catch (AggregateException a)
+                {
+                    foreach (Exception e in a.InnerExceptions)
+                        print($"Exception Thrown: {e.Message}\n{e.StackTrace}", RED);
 
-                    if (MANUAL_BUILD)
-                    {
-                        print(errorMsg, YELLOW);
-                        continue;
-                    }
-
-                    throw new Exception(errorMsg);
+                    timeout = true;
+                }
+                catch (Exception e)
+                {
+                    print($"Exception Thrown: {e.Message}\n{e.StackTrace}", RED);
+                    timeout = true;
                 }
 
-                if (File.Exists(destination))
-                    File.Delete(destination);
+                if (timeout)
+                {
+                    print($"Timing out for 1 minute.", RED);
 
-                File.Copy(sourcePath, destination);
+                    if (Debugger.IsAttached)
+                        Debugger.Break();
+
+                    await Task.Delay(60000);
+                }
             }
-
-            // Run data mining routines in parallel
-            // so they don't block each other.
-
-            var routines = new List<Task>();
-
-            foreach (DataMiner miner in miners)
-            {
-                Type type = miner.GetType();
-                print($"Executing data miner routine: {type.Name}", GREEN);
-
-                Task routine = Task.Run(() => miner.ExecuteRoutine());
-                routines.Add(routine);
-            }
-
-            await Task.WhenAll(routines);
-
-            foreach (Task routine in routines)
-                if (routine.Status == TaskStatus.Faulted)
-                    throw routine.Exception;
-
-            return true;
         }
 
-        static async Task TrackClientAsync()
+        static Task TrackClientAsync()
         {
             // Initialize the git repository.
             bool init = initGitBinding(Settings.Default.ClientRepoName);
@@ -466,10 +445,9 @@ namespace RobloxClientTracker
                 .Select(type => Activator.CreateInstance(type))
                 .Cast<DataMiner>();
 
-            // Start the main thread.
+            // Report set arguments.
             string currentVersion = BranchRegistry.GetString("Version");
-            print("Main thread starting!", MAGENTA);
-
+            
             if (FORCE_REBASE)
                 print("\tCaution: FORCE_REBASE is set to true!", YELLOW);
 
@@ -479,263 +457,298 @@ namespace RobloxClientTracker
             if (FORCE_COMMIT)
                 print("\tCaution: FORCE_COMMIT is set to true!", YELLOW);
 
-            while (true)
+            // Start the main thread.
+            return startRoutineLoop(async () =>
             {
-                print("Checking for updates...", CYAN);
+                // Check if the parent branch has been updated
 
-                try
+                if (branch != parent)
                 {
-                    // Check if the parent branch has been updated
-                    if (branch != parent)
+                    // Check if we are behind the upstream.
+                    if (!MANUAL_BUILD && (FORCE_REBASE || isRemoteBehind($"origin/{branch}", $"origin/{parent}")))
                     {
-                        // Check if we are behind the upstream.
-                        if (!MANUAL_BUILD && (FORCE_REBASE || isRemoteBehind($"origin/{branch}", $"origin/{parent}")))
+                        // Discard any local changes that might still be lingering.
+                        git("reset", "--hard", $"origin/{branch}");
+                        git("clean -d -f");
+
+                        // Merge with the parent upstream, keeping our own changes.
+                        // The assumption right now is that child branches are
+                        // ahead of the parent branches and will replace them.
+
+                        string message = $"Merge {parent}->{branch}";
+                        print($"Merging ({parent}->{branch})...", MAGENTA);
+
+                        var mergeResults = git("merge", $"-m \"{message}\"", "-X ours", $"origin/{parent}");
+                        bool hasConflicts = false;
+
+                        // Check if some merge conflicts have shown up.
+                        // This usually happens with LuaPackages >:(
+
+                        foreach (string result in mergeResults)
                         {
-                            // Discard any local changes that might still be lingering.
-                            git("reset", "--hard", $"origin/{branch}");
-                            git("clean -d -f");
-
-                            // Merge with the parent upstream, keeping our own changes.
-                            // The assumption right now is that child branches are
-                            // ahead of the parent branches and will replace them.
-
-                            string message = $"Merge {parent}->{branch}";
-                            print($"Merging ({parent}->{branch})...", MAGENTA);
-
-                            var mergeResults = git("merge", $"-m \"{message}\"", "-X ours", $"origin/{parent}");
-                            bool hasConflicts = false;
-
-                            // Check if some merge conflicts have shown up.
-                            // This usually happens with LuaPackages >:(
-
-                            foreach (string result in mergeResults)
+                            if (result.StartsWith("CONFLICT"))
                             {
-                                if (result.StartsWith("CONFLICT"))
-                                {
-                                    int splitPos = result.IndexOf(':') + 1;
+                                int splitPos = result.IndexOf(':') + 1;
 
-                                    string prefix = result.Substring(0, splitPos);
-                                    string msg = result.Substring(splitPos);
+                                string prefix = result.Substring(0, splitPos);
+                                string msg = result.Substring(splitPos);
 
-                                    log(prefix, RED);
-                                    print(msg, WHITE);
+                                log(prefix, RED);
+                                print(msg, WHITE);
 
-                                    hasConflicts = true;
-                                }
+                                hasConflicts = true;
                             }
-
-                            if (hasConflicts)
-                            {
-                                print("Unfortunately we have to do a hard reset :(", MAGENTA);
-                                git("reset", "--hard", $"origin/{parent}");
-                            }
-
-                            git("push", "--force");
-                            currentVersion = "";
                         }
+
+                        if (hasConflicts)
+                        {
+                            print("Unfortunately we have to do a hard reset :(", MAGENTA);
+                            git("reset", "--hard", $"origin/{parent}");
+                        }
+
+                        git("push", "--force");
+                        currentVersion = "";
+                    }
+                }
+
+                // Check for updates to the version
+                ClientVersionInfo info = null;
+
+                if (MANUAL_BUILD)
+                {
+                    print($"WARNING: Using manual build for branch {branch}!");
+
+                    string buildDir = Path.Combine(trunk, "builds", branch);
+                    string versionFile = Path.Combine(buildDir, "version.txt");
+
+                    if (!File.Exists(versionFile))
+                        throw new Exception($"MISSING FILE {versionFile}");
+
+                    info = new ClientVersionInfo()
+                    {
+                        Guid = "version-$guid",
+                        Version = File.ReadAllText(versionFile)
+                    };
+                }
+                else
+                {
+                    info = await StudioBootstrapper.GetCurrentVersionInfo(branch);
+                }
+
+                if (!string.IsNullOrEmpty(FORCE_VERSION_ID))
+                    info.Version = FORCE_VERSION_ID;
+
+                if (!string.IsNullOrEmpty(FORCE_VERSION_GUID))
+                    info.Guid = FORCE_VERSION_GUID;
+
+                if (FORCE_UPDATE || MANUAL_BUILD || info.Guid != currentVersion)
+                {
+                    // Make sure Roblox Studio is up to date for this build.
+                    print("Update detected!", YELLOW);
+                    
+                    if (!MANUAL_BUILD)
+                    {
+                        print("Syncing Roblox Studio...", GREEN);
+                        await studio.UpdateStudio();
                     }
 
-                    // Check for updates to the version
-                    ClientVersionInfo info = null;
+                    // Copy some metadata generated during the studio installation.
+                    string studioDir = studio.GetStudioDirectory();
 
+                    foreach (string fileName in filesToCopy)
+                    {
+                        string sourcePath = Path.Combine(studioDir, fileName);
+                        string destination = Path.Combine(stageDir, fileName);
+
+                        if (!File.Exists(sourcePath))
+                        {
+                            string errorMsg = $"Missing file to copy: {sourcePath}!!";
+
+                            if (MANUAL_BUILD)
+                            {
+                                print(errorMsg, YELLOW);
+                                continue;
+                            }
+
+                            throw new Exception(errorMsg);
+                        }
+
+                        if (File.Exists(destination))
+                            File.Delete(destination);
+
+                        File.Copy(sourcePath, destination);
+                    }
+
+                    // Run data mining routines in parallel
+                    // so they don't block each other.
+
+                    var routines = new List<Task>();
+
+                    foreach (DataMiner miner in dataMiners)
+                    {
+                        Type type = miner.GetType();
+                        print($"Executing data miner routine: {type.Name}", GREEN);
+
+                        Task routine = Task.Run(() => miner.ExecuteRoutine());
+                        routines.Add(routine);
+                    }
+
+                    await Task.WhenAll(routines);
+                    var exceptions = new List<Exception>();
+
+                    foreach (Task routine in routines)
+                    {
+                        if (routine.Status == TaskStatus.Faulted)
+                        {
+                            var e = routine.Exception;
+
+                            if (e is AggregateException a)
+                            {
+                                exceptions.AddRange(a.InnerExceptions);
+                                continue;
+                            }
+
+                            exceptions.Add(e);
+                        }
+                    }
+                    
+                    if (exceptions.Count > 0)
+                        throw new AggregateException(exceptions);
+                    
                     if (MANUAL_BUILD)
                     {
-                        print($"WARNING: Using manual build for branch {branch}!");
+                        print($"Stage assembled! Please create a commit with -m \"{info.Version}\"!", GREEN);
+                        print("Press any key to continue...");
 
-                        string buildDir = Path.Combine(trunk, "builds", branch);
-                        string versionFile = Path.Combine(buildDir, "version.txt");
-
-                        if (!File.Exists(versionFile))
-                            throw new Exception($"MISSING FILE {versionFile}");
-
-                        info = new ClientVersionInfo()
-                        {
-                            Guid = "version-$guid",
-                            Version = File.ReadAllText(versionFile)
-                        };
+                        Console.Read();
+                        Environment.Exit(0);
                     }
                     else
                     {
-                        info = await StudioBootstrapper.GetCurrentVersionInfo(branch);
-                    }
+                        // Create three commits:
+                        // - One for packages.
+                        // - One for lua files.
+                        // - One for everything else.
 
-                    if (!string.IsNullOrEmpty(FORCE_VERSION_ID))
-                        info.Version = FORCE_VERSION_ID;
+                        string versionId = info.Version;
+                        print("Creating commits...", YELLOW);
 
-                    if (!string.IsNullOrEmpty(FORCE_VERSION_GUID))
-                        info.Guid = FORCE_VERSION_GUID;
+                        bool didStagePackages = stageCommit($"{versionId} (Packages)", "*/_Index/*");
+                        bool didStageScripts = stageCommit($"{versionId} (Scripts)", "*.lua");
+                        bool didStageCore = stageCommit(versionId);
 
-                    if (FORCE_UPDATE || MANUAL_BUILD || info.Guid != currentVersion)
-                    {
-                        print("Update detected!", YELLOW);
-                        await updateClientTrackerStage(info, dataMiners);
-
-                        if (MANUAL_BUILD)
+                        if (didStagePackages || didStageScripts || didStageCore)
                         {
-                            print($"Stage assembled! Please create a commit with -m \"{info.Version}\"!", GREEN);
-                            print("Press any key to continue...");
+                            print("Pushing to GitHub...", CYAN);
+                            git("push");
 
-                            Console.Read();
-                            Environment.Exit(0);
-                        }
-                        else
-                        {
-                            // Create three commits:
-                            // - One for packages.
-                            // - One for lua files.
-                            // - One for everything else.
-
-                            string versionId = info.Version;
-                            print("Creating commits...", YELLOW);
-
-                            bool didStagePackages = stageCommit($"{versionId} (Packages)", "*/_Index/*");
-                            bool didStageScripts = stageCommit($"{versionId} (Scripts)", "*.lua");
-                            bool didStageCore = stageCommit(versionId);
-
-                            if (didStagePackages || didStageScripts || didStageCore)
-                            {
-                                print("Pushing to GitHub...", CYAN);
-                                git("push");
-
-                                print("\tDone!", GREEN);
-                            }
-
-                            currentVersion = info.Guid;
-                            BranchRegistry.SetValue("Version", info.Guid);
+                            print("\tDone!", GREEN);
                         }
 
+                        currentVersion = info.Guid;
+                        BranchRegistry.SetValue("Version", info.Guid);
                     }
-                    else
-                    {
-                        print("No updates right now!", GREEN);
-                    }
-
-                    print($"Next update check in {UPDATE_FREQUENCY} minutes.", YELLOW);
-                    await Task.Delay(UPDATE_FREQUENCY * 60000);
                 }
-                catch (Exception e)
+                else
                 {
-                    print($"Exception Thrown: {e.Message}\n{e.StackTrace}\nTiming out for 1 minute.", RED);
-
-                    if (Debugger.IsAttached)
-                        Debugger.Break();
-
-                    await Task.Delay(60000);
+                    print("No updates right now!", GREEN);
                 }
-            }
+            });
         }
 
-        static async Task TrackFFlagsAsync()
+        static Task TrackFFlagsAsync()
         {
             // Initialize Repository
+            const string fflagEndpoint = "https://clientsettingscdn.roblox.com/v1/settings/application?applicationName=";
             initGitBinding(Settings.Default.FFlagRepoName);
 
             // Start tracking...
-            print("Main thread starting!", MAGENTA);
-
             git("reset --hard origin/master");
             git("pull");
 
-            while (true)
+            return startRoutineLoop(async () =>
             {
-                print("Updating flags...", CYAN);
+                var taskPool = new List<Task>();
 
-                try
+                foreach (string platform in fflagPlatforms)
                 {
-                    var taskPool = new List<Task>();
-
-                    foreach (string platform in fflagPlatforms)
+                    Task updatePlatform = Task.Run(async () =>
                     {
-                        Task updatePlatform = Task.Run(async () =>
+                        string json = "";
+
+                        using (WebClient http = new WebClient())
                         {
-                            string json = "";
+                            http.Headers.Set("UserAgent", "RobloxStudio/WinInet");
+                            json = await http.DownloadStringTaskAsync(fflagEndpoint + platform);
+                        }
 
-                            using (WebClient http = new WebClient())
+                        using (var jsonText = new StringReader(json))
+                        {
+                            JsonTextReader reader = new JsonTextReader(jsonText);
+
+                            JObject root = JObject.Load(reader);
+                            JObject appSettings = root.Value<JObject>("applicationSettings");
+
+                            var keys = new List<string>();
+
+                            foreach (var pair in appSettings)
+                                keys.Add(pair.Key);
+
+                            var result = new StringBuilder();
+                            int testInt = 0;
+
+                            result.AppendLine("{");
+                            keys.Sort();
+
+                            for (int i = 0; i < keys.Count; i++)
                             {
-                                http.Headers.Set("UserAgent", "Roblox/WinInet");
-                                json = await http.DownloadStringTaskAsync(fflagEndpoint + platform);
+                                string key = keys[i];
+
+                                string value = appSettings.Value<string>(key);
+                                string lower = value.ToLowerInvariant();
+
+                                if (i != 0)
+                                    result.Append(",\r\n");
+
+                                if (lower == "true" || lower == "false")
+                                    value = lower;
+                                else if (!int.TryParse(value, out testInt))
+                                    value = '"' + value.Replace("\"", "\\\"", StringComparison.InvariantCulture) + '"';
+
+                                result.Append($"\t\"{key}\": {value}");
                             }
 
-                            using (var jsonText = new StringReader(json))
+                            result.Append("\r\n}");
+
+                            string filePath = Path.Combine(stageDir, platform + ".json");
+                            string newFile = result.ToString();
+                            string oldFile = "";
+
+                            if (File.Exists(filePath))
+                                oldFile = File.ReadAllText(filePath);
+
+                            if (oldFile != newFile)
                             {
-                                JsonTextReader reader = new JsonTextReader(jsonText);
-
-                                JObject root = JObject.Load(reader);
-                                JObject appSettings = root.Value<JObject>("applicationSettings");
-
-                                var keys = new List<string>();
-
-                                foreach (var pair in appSettings)
-                                    keys.Add(pair.Key);
-
-                                var result = new StringBuilder();
-                                int testInt = 0;
-
-                                result.AppendLine("{");
-                                keys.Sort();
-
-                                for (int i = 0; i < keys.Count; i++)
-                                {
-                                    string key = keys[i];
-
-                                    string value = appSettings.Value<string>(key);
-                                    string lower = value.ToLowerInvariant();
-
-                                    if (i != 0)
-                                        result.Append(",\r\n");
-
-                                    if (lower == "true" || lower == "false")
-                                        value = lower;
-                                    else if (!int.TryParse(value, out testInt))
-                                        value = '"' + value.Replace("\"", "\\\"", StringComparison.InvariantCulture) + '"';
-
-                                    result.Append($"\t\"{key}\": {value}");
-                                }
-
-                                result.Append("\r\n}");
-
-                                string filePath = Path.Combine(stageDir, platform + ".json");
-                                string newFile = result.ToString();
-                                string oldFile = "";
-
-                                if (File.Exists(filePath))
-                                    oldFile = File.ReadAllText(filePath);
-
-                                if (oldFile != newFile)
-                                {
-                                    print($"\tUpdating {platform}.json ...", YELLOW);
-                                    File.WriteAllText(filePath, newFile);
-                                }
+                                print($"\tUpdating {platform}.json ...", YELLOW);
+                                File.WriteAllText(filePath, newFile);
                             }
-                        });
+                        }
+                    });
 
-                        taskPool.Add(updatePlatform);
-                    }
-
-                    await Task.WhenAll(taskPool);
-                    string timeStamp = DateTime.Now.ToString();
-
-                    if (stageCommit(timeStamp))
-                    {
-                        print("Pushing to GitHub...", CYAN);
-                        git("push");
-
-                        print("\tDone!", GREEN);
-                    }
-                    
-                    print($"Next update check in {UPDATE_FREQUENCY} minutes.", YELLOW);
-                    await Task.Delay(UPDATE_FREQUENCY * 60000);
+                    taskPool.Add(updatePlatform);
                 }
-                catch (Exception e)
+
+                await Task.WhenAll(taskPool);
+                string timeStamp = DateTime.Now.ToString();
+
+                if (stageCommit(timeStamp))
                 {
-                    print($"Exception Thrown: {e.Message}\n{e.StackTrace}\nTiming out for 1 minute.", RED);
+                    print("Pushing to GitHub...", CYAN);
+                    git("push");
 
-                    if (Debugger.IsAttached)
-                        Debugger.Break();
-
-                    await Task.Delay(60000);
+                    print("\tDone!", GREEN);
                 }
-            }
+            });
         }
 
         static void Main(string[] args)
@@ -819,21 +832,10 @@ namespace RobloxClientTracker
                 mainThread = Task.Run(TrackClientAsync);
             else if (TRACK_MODE == TrackMode.FastFlags)
                 mainThread = Task.Run(TrackFFlagsAsync);
+            else
+                return;
 
-            try
-            {
-                mainThread?.Wait();
-            }
-            catch (Exception e)
-            {
-                print($"An error occurred: {e.Message} {e.StackTrace}", RED);
-                Debugger.Break();
-            }
-            finally
-            {
-                print("Press any key to continue...", GRAY);
-                Console.Read();
-            }
+            mainThread.Wait();
         }
     }
 }

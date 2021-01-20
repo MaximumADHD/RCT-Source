@@ -48,8 +48,8 @@ namespace RobloxClientTracker
             fileRegistry = root.Open("FileManifest");
             fileRepairs = fileRegistry.Open("Repairs");
 
-            http.Headers.Set(HttpRequestHeader.UserAgent, "Roblox");
-        }
+            http.Headers.Set(HttpRequestHeader.UserAgent, "RobloxClientTracker");
+        }  
 
         private static string computeSignature(Stream source)
         {

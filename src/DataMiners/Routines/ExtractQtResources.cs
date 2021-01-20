@@ -14,9 +14,9 @@ namespace RobloxClientTracker
 
         private static Dictionary<string, byte[]> luaFiles = new Dictionary<string, byte[]>
         {
+            { "BinaryReader.lua",  Resources.BinaryReader_lua },
             { "QtExtract.lua",     Resources.QtExtract_lua    },
             { "PEParser.lua",      Resources.PEParser_lua     },
-            { "BinaryReader.lua",  Resources.BinaryReader_lua },
             { "Deflate.lua",       Resources.Deflate_lua      },
             { "Bit.lua",           Resources.Bit_lua          },
         };
