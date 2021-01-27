@@ -90,7 +90,7 @@ namespace RobloxClientTracker
             "StudioApp"
         };
 
-        static List<string> boringFiles = new List<string>()
+        static readonly IReadOnlyList<string> boringFiles = new List<string>()
         {
             "rbxManifest.txt",
             "rbxPkgManifest.txt",
@@ -104,7 +104,7 @@ namespace RobloxClientTracker
             "DeepStrings.txt",
         };
 
-        static List<string> filesToCopy = new List<string>
+        static readonly IReadOnlyList<string> filesToCopy = new List<string>
         {
             "version.txt",
             "version-guid.txt",
@@ -118,7 +118,7 @@ namespace RobloxClientTracker
             "RobloxStudioRibbon.xml"
         };
 
-        static Dictionary<string, ConsoleColor> changeTypeColors = new Dictionary<string, ConsoleColor>()
+        static readonly IReadOnlyDictionary<string, ConsoleColor> changeTypeColors = new Dictionary<string, ConsoleColor>()
         {
             { "A", GREEN   },
             { "D", RED     },
