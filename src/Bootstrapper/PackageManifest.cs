@@ -8,59 +8,57 @@ namespace RobloxClientTracker
 {
     public struct Package
     {
-        public string Name;
-        public string Signature;
-        public int PackedSize;
-        public int Size;
+        public string Name      { get; set; }
+        public string Signature { get; set; }
+        public int PackedSize   { get; set; }
+        public int Size         { get; set; }
     }
 
     public class PackageManifest : List<Package>
     {
-        public readonly string RawData;
+        public string RawData { get; private set; }
 
         private PackageManifest(string data)
         {
             RawData = data;
 
-            using (StringReader reader = new StringReader(data))
+            using StringReader reader = new StringReader(data);
+            string version = reader.ReadLine();
+
+            if (version != "v0")
             {
-                string version = reader.ReadLine();
+                string errorMsg = $"Unexpected package manifest version: {version} (expected v0!)\n" +
+                                   "Please contact CloneTrooper1019 if you see this error.";
 
-                if (version != "v0")
+                throw new NotSupportedException(errorMsg);
+            }
+
+            while (true)
+            {
+                try
                 {
-                    string errorMsg = $"Unexpected package manifest version: {version} (expected v0!)\n" +
-                                       "Please contact CloneTrooper1019 if you see this error.";
+                    string fileName = reader.ReadLine();
+                    string signature = reader.ReadLine();
 
-                    throw new NotSupportedException(errorMsg);
-                }
+                    int packedSize = int.Parse(reader.ReadLine(), Program.InvariantNumber);
+                    int size = int.Parse(reader.ReadLine(), Program.InvariantNumber);
 
-                while (true)
-                {
-                    try
+                    if (fileName.EndsWith(".zip", Program.InvariantString))
                     {
-                        string fileName = reader.ReadLine();
-                        string signature = reader.ReadLine();
-
-                        int packedSize = int.Parse(reader.ReadLine());
-                        int size = int.Parse(reader.ReadLine());
-
-                        if (fileName.EndsWith(".zip"))
+                        var package = new Package()
                         {
-                            var package = new Package()
-                            {
-                                Name = fileName,
-                                Signature = signature,
-                                PackedSize = packedSize,
-                                Size = size
-                            };
+                            Name = fileName,
+                            Signature = signature,
+                            PackedSize = packedSize,
+                            Size = size
+                        };
 
-                            Add(package);
-                        }
+                        Add(package);
                     }
-                    catch
-                    {
-                        break;
-                    }
+                }
+                catch
+                {
+                    break;
                 }
             }
         }

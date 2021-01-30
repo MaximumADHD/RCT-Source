@@ -10,7 +10,7 @@ namespace RobloxClientTracker
     public class UnpackShaders : DataMiner
     {
         public override ConsoleColor LogColor => ConsoleColor.Green;
-        private HashSet<string> writtenHeaders = new HashSet<string>();
+        private readonly HashSet<string> writtenHeaders = new HashSet<string>();
 
         public string IncludeDir { get; private set; }
 
@@ -53,7 +53,7 @@ namespace RobloxClientTracker
                 ShaderPack pack = new ShaderPack(shaderPath);
                 var myShaders = new Dictionary<string, string>();
 
-                string name = pack.Name.Replace("shaders_", "");
+                string name = pack.Name.Replace("shaders_", "", Program.InvariantString);
                 names.Add(name);
 
                 List<ShaderFile> shaderFiles = pack.Shaders.ToList();
@@ -119,7 +119,7 @@ namespace RobloxClientTracker
                 }
                 catch
                 {
-                    return a.CompareTo(b);
+                    return string.Compare(a, b, Program.InvariantString);
                 }
             });
 

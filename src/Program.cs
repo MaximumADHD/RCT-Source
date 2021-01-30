@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Diagnostics;
+using System.Globalization;
 using System.IO;
 using System.Net;
 using System.Linq;
@@ -16,8 +17,6 @@ using Newtonsoft.Json.Linq;
 
 using CliWrap;
 using CliWrap.EventStream;
-
-#pragma warning disable CA1303 // Do not pass literals as localized parameters
 
 namespace RobloxClientTracker
 {
@@ -76,6 +75,10 @@ namespace RobloxClientTracker
         public static string FORCE_VERSION_GUID = "";
         public static string FORCE_VERSION_ID = "";
 
+        public static readonly CultureInfo Invariant = CultureInfo.InvariantCulture;
+        public static NumberFormatInfo InvariantNumber = NumberFormatInfo.InvariantInfo;
+        public const StringComparison InvariantString = StringComparison.InvariantCulture;
+        
         static readonly string[] fflagPlatforms = new string[]
         {
             "PCDesktopClient",
@@ -137,7 +140,7 @@ namespace RobloxClientTracker
         public static string studioPath { get; private set; }
         public static StudioBootstrapper studio { get; private set; }
 
-        static Dictionary<string, string> argMap = new Dictionary<string, string>();
+        static readonly Dictionary<string, string> argMap = new Dictionary<string, string>();
         
         public static void print(string message, ConsoleColor color = GRAY)
         {
@@ -227,12 +230,12 @@ namespace RobloxClientTracker
             var query = git("status", "-s");
             var result = new List<string>();
 
-            string pattern = filter.Replace("*", ".*");
+            string pattern = filter.Replace("*", ".*", Program.InvariantString);
 
             foreach (string line in query)
             {
                 string type = line.Substring(0, 2).Trim();
-                string file = line.Substring(3);
+                string file = line[3..];
 
                 if (!Regex.IsMatch(file, pattern))
                     continue;
@@ -290,7 +293,7 @@ namespace RobloxClientTracker
 
                     if (branch != "roblox")
                     {
-                        if (boringFiles.Contains(fileInfo.Name) || fileInfo.Extension.Contains("rbx"))
+                        if (boringFiles.Contains(fileInfo.Name) || fileInfo.Extension.Contains("rbx", InvariantString))
                         {
                             boringCount++;
                             continue;
@@ -486,12 +489,12 @@ namespace RobloxClientTracker
 
                         foreach (string result in mergeResults)
                         {
-                            if (result.StartsWith("CONFLICT"))
+                            if (result.StartsWith("CONFLICT", InvariantString))
                             {
-                                int splitPos = result.IndexOf(':') + 1;
+                                int splitPos = result.IndexOf(':', InvariantString) + 1;
 
                                 string prefix = result.Substring(0, splitPos);
-                                string msg = result.Substring(splitPos);
+                                string msg = result[splitPos..];
 
                                 log(prefix, RED);
                                 print(msg, WHITE);
@@ -682,56 +685,54 @@ namespace RobloxClientTracker
                             json = await http.DownloadStringTaskAsync(fflagEndpoint + platform);
                         }
 
-                        using (var jsonText = new StringReader(json))
+                        using var jsonText = new StringReader(json);
+                        JsonTextReader reader = new JsonTextReader(jsonText);
+
+                        JObject root = JObject.Load(reader);
+                        JObject appSettings = root.Value<JObject>("applicationSettings");
+
+                        var keys = new List<string>();
+
+                        foreach (var pair in appSettings)
+                            keys.Add(pair.Key);
+
+                        var result = new StringBuilder();
+                        int testInt = 0;
+
+                        result.AppendLine("{");
+                        keys.Sort();
+
+                        for (int i = 0; i < keys.Count; i++)
                         {
-                            JsonTextReader reader = new JsonTextReader(jsonText);
+                            string key = keys[i];
 
-                            JObject root = JObject.Load(reader);
-                            JObject appSettings = root.Value<JObject>("applicationSettings");
+                            string value = appSettings.Value<string>(key);
+                            string lower = value.ToLowerInvariant();
 
-                            var keys = new List<string>();
+                            if (i != 0)
+                                result.Append(",\r\n");
 
-                            foreach (var pair in appSettings)
-                                keys.Add(pair.Key);
+                            if (lower == "true" || lower == "false")
+                                value = lower;
+                            else if (!int.TryParse(value, out testInt))
+                                value = '"' + value.Replace("\"", "\\\"", InvariantString) + '"';
 
-                            var result = new StringBuilder();
-                            int testInt = 0;
+                            result.Append($"\t\"{key}\": {value}");
+                        }
 
-                            result.AppendLine("{");
-                            keys.Sort();
+                        result.Append("\r\n}");
 
-                            for (int i = 0; i < keys.Count; i++)
-                            {
-                                string key = keys[i];
+                        string filePath = Path.Combine(stageDir, platform + ".json");
+                        string newFile = result.ToString();
+                        string oldFile = "";
 
-                                string value = appSettings.Value<string>(key);
-                                string lower = value.ToLowerInvariant();
+                        if (File.Exists(filePath))
+                            oldFile = File.ReadAllText(filePath);
 
-                                if (i != 0)
-                                    result.Append(",\r\n");
-
-                                if (lower == "true" || lower == "false")
-                                    value = lower;
-                                else if (!int.TryParse(value, out testInt))
-                                    value = '"' + value.Replace("\"", "\\\"", StringComparison.InvariantCulture) + '"';
-
-                                result.Append($"\t\"{key}\": {value}");
-                            }
-
-                            result.Append("\r\n}");
-
-                            string filePath = Path.Combine(stageDir, platform + ".json");
-                            string newFile = result.ToString();
-                            string oldFile = "";
-
-                            if (File.Exists(filePath))
-                                oldFile = File.ReadAllText(filePath);
-
-                            if (oldFile != newFile)
-                            {
-                                print($"\tUpdating {platform}.json ...", YELLOW);
-                                File.WriteAllText(filePath, newFile);
-                            }
+                        if (oldFile != newFile)
+                        {
+                            print($"\tUpdating {platform}.json ...", YELLOW);
+                            File.WriteAllText(filePath, newFile);
                         }
                     });
 
@@ -739,7 +740,7 @@ namespace RobloxClientTracker
                 }
 
                 await Task.WhenAll(taskPool);
-                string timeStamp = DateTime.Now.ToString();
+                string timeStamp = DateTime.Now.ToString(CultureInfo.InvariantCulture);
 
                 if (stageCommit(timeStamp))
                 {
@@ -758,7 +759,7 @@ namespace RobloxClientTracker
 
             foreach (string arg in args)
             {
-                if (arg.StartsWith("-", StringComparison.InvariantCulture))
+                if (arg.StartsWith("-", InvariantString))
                 {
                     if (!string.IsNullOrEmpty(argKey))
                         argMap.Add(argKey, "");

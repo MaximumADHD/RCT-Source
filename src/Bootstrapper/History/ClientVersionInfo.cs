@@ -16,28 +16,24 @@ namespace RobloxClientTracker
         {
             string jsonUrl = $"https://clientsettings.{branch}.com/v1/client-version/{buildType}";
             var versionInfo = new ClientVersionInfo();
-            
-            using (WebClient http = new WebClient())
-            {
-                string json = await http.DownloadStringTaskAsync(jsonUrl);
-                
-                using (var jsonText = new StringReader(json))
-                using (var reader = new JsonTextReader(jsonText))
-                {
-                    JObject jsonData = JObject.Load(reader);
 
-                    versionInfo.Version = jsonData.Value<string>("version");
-                    versionInfo.Guid = jsonData.Value<string>("clientVersionUpload");
+            using WebClient http = new WebClient();
+            string json = await http.DownloadStringTaskAsync(jsonUrl);
 
-                    if (!string.IsNullOrEmpty(Program.FORCE_VERSION_GUID))
-                        versionInfo.Guid = Program.FORCE_VERSION_GUID;
+            using var jsonText = new StringReader(json);
+            using var reader = new JsonTextReader(jsonText);
 
-                    if (!string.IsNullOrEmpty(Program.FORCE_VERSION_ID))
-                        versionInfo.Version = Program.FORCE_VERSION_ID;
+            JObject jsonData = JObject.Load(reader);
+            versionInfo.Version = jsonData.Value<string>("version");
+            versionInfo.Guid = jsonData.Value<string>("clientVersionUpload");
 
-                    return versionInfo;
-                }
-            }
+            if (!string.IsNullOrEmpty(Program.FORCE_VERSION_GUID))
+                versionInfo.Guid = Program.FORCE_VERSION_GUID;
+
+            if (!string.IsNullOrEmpty(Program.FORCE_VERSION_ID))
+                versionInfo.Version = Program.FORCE_VERSION_ID;
+
+            return versionInfo;
         }
     }
 }

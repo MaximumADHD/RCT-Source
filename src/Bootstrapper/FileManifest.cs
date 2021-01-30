@@ -7,36 +7,34 @@ namespace RobloxClientTracker
 {
     public class FileManifest : Dictionary<string, string>
     {
-        public readonly string RawData;
+        public string RawData { get; private set; }
 
         private FileManifest(string data)
         {
+            using StringReader reader = new StringReader(data);
             RawData = data;
 
-            using (StringReader reader = new StringReader(data))
+            string path = "";
+            string signature = "";
+
+            while (path != null && signature != null)
             {
-                string path = "";
-                string signature = "";
-
-                while (path != null && signature != null)
+                try
                 {
-                    try
-                    {
-                        path = reader.ReadLine();
-                        signature = reader.ReadLine();
+                    path = reader.ReadLine();
+                    signature = reader.ReadLine();
 
-                        if (path == null || signature == null)
-                            break;
-
-                        if (path.StartsWith("ExtraContent"))
-                            path = "content" + path.Substring(12);
-
-                        Add(path, signature);
-                    }
-                    catch
-                    {
+                    if (path == null || signature == null)
                         break;
-                    }
+
+                    if (path.StartsWith("ExtraContent", Program.InvariantString))
+                        path = "content" + path[12..];
+
+                    Add(path, signature);
+                }
+                catch
+                {
+                    break;
                 }
             }
         }

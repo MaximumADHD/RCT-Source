@@ -17,8 +17,8 @@ namespace RobloxClientTracker
         public short NumGroups { get; private set; }
         public short NumShaders { get; private set; }
 
-        private string[] GroupsImpl;
-        private ShaderFile[] ShadersImpl;
+        private readonly string[] GroupsImpl;
+        private readonly ShaderFile[] ShadersImpl;
 
         public IReadOnlyList<string> Groups => GroupsImpl;
         public IReadOnlyList<ShaderFile> Shaders => ShadersImpl;
@@ -32,69 +32,68 @@ namespace RobloxClientTracker
         {
             FileInfo info = new FileInfo(filePath);
 
-            using (FileStream file = File.OpenRead(filePath))
-            using (BinaryReader reader = new BinaryReader(file))
+            using FileStream file = File.OpenRead(filePath);
+            using BinaryReader reader = new BinaryReader(file);
+
+            Header = reader.ReadString(4);
+            Version = reader.ReadInt32();
+
+            NumGroups = reader.ReadInt16();
+            NumShaders = reader.ReadInt16();
+
+            Name = info.Name.Replace(info.Extension, "", Program.InvariantString);
+            Hash = reader.ReadInt32();
+
+            GroupsImpl = new string[NumGroups];
+            ShadersImpl = new ShaderFile[NumShaders];
+
+            // Read Groups
+            for (int i = 0; i < NumGroups; i++)
+                GroupsImpl[i] = reader.ReadString(64);
+
+            // Read Shaders
+            for (int i = 0; i < NumShaders; i++)
             {
-                Header = reader.ReadString(4);
-                Version = reader.ReadInt32();
+                string name = reader.ReadString(64);
 
-                NumGroups = reader.ReadInt16();
-                NumShaders = reader.ReadInt16();
+                byte[] rawHash = reader.ReadBytes(16);
+                string hash = Convert.ToBase64String(rawHash);
 
-                Name = info.Name.Replace(info.Extension, "");
-                Hash = reader.ReadInt32();
-
-                GroupsImpl = new string[NumGroups];
-                ShadersImpl = new ShaderFile[NumShaders];
-
-                // Read Groups
-                for (int i = 0; i < NumGroups; i++)
-                    GroupsImpl[i] = reader.ReadString(64);
-
-                // Read Shaders
-                for (int i = 0; i < NumShaders; i++)
+                var shader = new ShaderFile
                 {
-                    string name = reader.ReadString(64);
+                    Name = name,
+                    Hash = hash,
 
-                    byte[] rawHash = reader.ReadBytes(16);
-                    string hash = Convert.ToBase64String(rawHash);
+                    Offset = reader.ReadInt32(),
+                    Size = reader.ReadInt32(),
+                };
 
-                    var shader = new ShaderFile
-                    {
-                        Name = name,
-                        Hash = hash,
+                if (Version > 6)
+                    shader.Level = reader.ReadInt32();
 
-                        Offset = reader.ReadInt32(),
-                        Size = reader.ReadInt32(),
-                    };
+                shader.ShaderType = (ShaderType)reader.ReadByte();
+                shader.Group = Groups[reader.ReadByte()];
 
-                    if (Version > 6)
-                        shader.Level = reader.ReadInt32();
+                if (Version > 6)
+                    shader.Stub = reader.ReadBytes(2);
+                else
+                    shader.Stub = reader.ReadBytes(6);
 
-                    shader.ShaderType = (ShaderType)reader.ReadByte();
-                    shader.Group = Groups[reader.ReadByte()];
+                ShadersImpl[i] = shader;
+            }
 
-                    if (Version > 6)
-                        shader.Stub = reader.ReadBytes(2);
-                    else
-                        shader.Stub = reader.ReadBytes(6);
-
-                    ShadersImpl[i] = shader;
-                }
-
-                // Unpack the shader files
-                foreach (ShaderFile shader in Shaders)
-                {
-                    file.Position = shader.Offset;
-                    shader.Buffer = reader.ReadBytes(shader.Size);
-                }
+            // Unpack the shader files
+            foreach (ShaderFile shader in Shaders)
+            {
+                file.Position = shader.Offset;
+                shader.Buffer = reader.ReadBytes(shader.Size);
             }
         }
 
         public HashSet<string> UnpackShader(UnpackShaders unpacker, string exportDir)
         {
             var shaderManifest = Program.BranchRegistry.Open("ShaderManifest");
-            string shaderKey = Name.Replace("shaders_", "");
+            string shaderKey = Name.Replace("shaders_", "", Program.InvariantString);
             
             var shaderReg = shaderManifest.Open(shaderKey);
             string root = Groups[0];

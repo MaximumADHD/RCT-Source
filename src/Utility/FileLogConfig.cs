@@ -4,7 +4,7 @@ namespace RobloxClientTracker
 {
     public struct FileLogConfig
     {
-        public ConsoleColor Color;
-        public int Stack;
+        public ConsoleColor Color { get; set; }
+        public int Stack { get; set; }
     }
 }

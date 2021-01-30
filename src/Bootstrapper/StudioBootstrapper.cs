@@ -15,19 +15,17 @@ namespace RobloxClientTracker
 {
     public class StudioBootstrapper
     {
-        private string branch;
+        private readonly string branch;
         private string buildVersion;
-
         private FileManifest fileManifest;
-        private HashSet<string> writtenFiles;
-
+        
         private const string appSettingsXml =
             "<Settings>\n" +
             "   <ContentFolder>content</ContentFolder>\n" +
             "   <BaseUrl>http://www.roblox.com</BaseUrl>\n" +
             "</Settings>";
 
-        private static WebClient http = new WebClient();
+        private static readonly WebClient http = new WebClient();
 
         private static RegistryKey root = Program.BranchRegistry;
 
@@ -53,24 +51,20 @@ namespace RobloxClientTracker
 
         private static string computeSignature(Stream source)
         {
-            using (MD5 md5 = MD5.Create())
-            {
-                byte[] hash = md5.ComputeHash(source);
+            using MD5 md5 = MD5.Create();
+            byte[] hash = md5.ComputeHash(source);
 
-                string result = BitConverter.ToString(hash)
-                    .Replace("-", "", StringComparison.InvariantCulture)
-                    .ToLower(CultureInfo.InvariantCulture);
+            string result = BitConverter.ToString(hash)
+                .Replace("-", "", Program.InvariantString)
+                .ToLower(CultureInfo.InvariantCulture);
 
-                return result;
-            }
+            return result;
         }
 
         private static string computeSignature(ZipArchiveEntry entry)
         {
-            using (Stream stream = entry.Open())
-            {
-                return computeSignature(stream);
-            }
+            using Stream stream = entry.Open();
+            return computeSignature(stream);
         }
 
         private static void tryToKillProcess(Process process)
@@ -115,7 +109,9 @@ namespace RobloxClientTracker
                 // mod manager do not record which files are outside of the manifest, but valid otherwise.
                 // TODO: Need a more proper way of handling this
 
-                if (fileName.Contains("/") || fileName.EndsWith(".dll") && !fileName.Contains("\\"))
+                if ( fileName.Contains("/",    Program.InvariantString) || 
+                     fileName.EndsWith(".dll", Program.InvariantString) && 
+                    !fileName.Contains("\\",   Program.InvariantString))
                     continue;
 
                 string filePath = Path.Combine(studioDir, fileName);
@@ -150,7 +146,7 @@ namespace RobloxClientTracker
 
                                 if (fileManifest.ContainsValue(sig))
                                 {
-                                    if (!fileName.StartsWith("content"))
+                                    if (!fileName.StartsWith("content", Program.InvariantString))
                                     {
                                         // The path may have been labeled incorrectly in the manifest.
                                         // Record it for future reference so we don't have to
@@ -255,12 +251,12 @@ namespace RobloxClientTracker
         // YOU WERE SO CLOSE ROBLOX, AGHHHH
         private static string fixFilePath(string pkgName, string filePath)
         {
-            string pkgDir = pkgName.Replace(".zip", "");
+            string pkgDir = pkgName.Replace(".zip", "", Program.InvariantString);
 
-            if ((pkgDir == "Plugins" || pkgDir == "Qml") && !filePath.StartsWith(pkgDir))
+            if ((pkgDir == "Plugins" || pkgDir == "Qml") && !filePath.StartsWith(pkgDir, Program.InvariantString))
                 filePath = pkgDir + '\\' + filePath;
-            else if (filePath.StartsWith("ExtraContent"))
-                filePath = filePath.Replace("ExtraContent", "content");
+            else if (filePath.StartsWith("ExtraContent", Program.InvariantString))
+                filePath = filePath.Replace("ExtraContent", "content", Program.InvariantString);
 
             return filePath;
         }
@@ -368,11 +364,11 @@ namespace RobloxClientTracker
                                     string filePath = fixFilePath(pkgName, file);
                                     string entryPath = entry.FullName.Replace('/', '\\');
 
-                                    if (filePath.EndsWith(entryPath))
+                                    if (filePath.EndsWith(entryPath, Program.InvariantString))
                                     {
                                         // We can infer what the root extraction  
                                         // directory is for the files in this package!                                 
-                                        localRootDir = filePath.Replace(entryPath, "");
+                                        localRootDir = filePath.Replace(entryPath, "", Program.InvariantString);
                                     }
                                 }
                             }
@@ -512,10 +508,8 @@ namespace RobloxClientTracker
                 File.WriteAllText(versionPath, versionId);
 
                 echo($"Installing Version {versionId} of Roblox Studio...");
-
                 var taskQueue = new List<Task>();
-                writtenFiles = new HashSet<string>();
-
+                
                 echo("Grabbing package manifest...");
                 var pkgManifest = await PackageManifest.Get(branch, buildVersion);
 

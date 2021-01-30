@@ -11,3 +11,24 @@ dotnet_diagnostic.CA1707.severity = none
 
 # CA2007: Consider calling ConfigureAwait on the awaited task
 dotnet_diagnostic.CA2007.severity = none
+
+# CA1815: Override equals and operator equals on value types
+dotnet_diagnostic.CA1815.severity = silent
+
+# CA1710: Identifiers should have correct suffix
+dotnet_diagnostic.CA1710.severity = none
+
+# CA1031: Do not catch general exception types
+dotnet_diagnostic.CA1031.severity = none
+
+# CA1720: Identifier contains type name
+dotnet_diagnostic.CA1720.severity = none
+
+# CA1819: Properties should not return arrays
+dotnet_diagnostic.CA1819.severity = none
+
+# IDE1006: Naming Styles
+dotnet_diagnostic.IDE1006.severity = none
+
+# CA1303: Do not pass literals as localized parameters
+dotnet_diagnostic.CA1303.severity = none

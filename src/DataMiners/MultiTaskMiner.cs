@@ -10,7 +10,7 @@ namespace RobloxClientTracker
     /// </summary>
     public abstract class MultiTaskMiner : DataMiner
     {
-        private List<Action> routines = new List<Action>();
+        private readonly List<Action> routines = new List<Action>();
 
         protected void addRoutine(Action routine)
         {

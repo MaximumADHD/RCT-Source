@@ -7,8 +7,7 @@ namespace RobloxClientTracker
     public class SystemEvent : EventWaitHandle
     {
         public string Name { get; private set; }
-        public bool FireEvent() => Set();
-
+        
         public SystemEvent(string name, bool init = false, EventResetMode mode = EventResetMode.AutoReset) : base(init, mode, name)
         {
             if (init)

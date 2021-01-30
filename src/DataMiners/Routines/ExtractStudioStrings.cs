@@ -33,16 +33,16 @@ namespace RobloxClientTracker
             UNDNAME_NO_SPECIAL_SYMS = (0x4000),  // Don't undecorate special names (v-table, vcall, vector xxx, metatype, etc)
         }
 
-        [DllImport("dbghelp.dll", SetLastError = true, PreserveSig = true)]
+        [DllImport("dbghelp.dll", SetLastError = true, PreserveSig = true, CharSet = CharSet.Unicode)]
         static extern int UnDecorateSymbolName
         (
-            [In]  [MarshalAs(UnmanagedType.LPStr)] string DecoratedName,
-            [Out]  StringBuilder UnDecoratedName,
-            [In]  [MarshalAs(UnmanagedType.U4)] int UndecoratedLength,
-            [In]  [MarshalAs(UnmanagedType.U4)] UnDecorateFlags Flags
+            [MarshalAs(UnmanagedType.LPWStr)] [In]  string DecoratedName,
+                                              [Out] StringBuilder UnDecoratedName,
+            [MarshalAs(UnmanagedType.U4)]     [In]  int UndecoratedLength,
+            [MarshalAs(UnmanagedType.U4)]     [In]  UnDecorateFlags Flags
         );
 
-        static IReadOnlyDictionary<string, string> TypeSimplify = new Dictionary<string, string>()
+        static readonly IReadOnlyDictionary<string, string> TypeSimplify = new Dictionary<string, string>()
         {
             { "std::basic_string<char,struct std::char_traits<char>,class std::allocator<char> >", "std::string" }
         };
@@ -121,10 +121,10 @@ namespace RobloxClientTracker
             {
                 string data = '?' + symbol;
 
-                if (data.ToUpperInvariant().EndsWith("@@"))
+                if (data.ToUpperInvariant().EndsWith("@@", Program.InvariantString))
                 {
                     StringBuilder output = new StringBuilder(8192);
-                    UnDecorateSymbolName(data, output, 8192, UnDecorateFlags.UNDNAME_NO_ARGUMENTS | UnDecorateFlags.UNDNAME_NO_LEADING_UNDERSCORES);
+                    int hResult = UnDecorateSymbolName(data, output, 8192, UnDecorateFlags.UNDNAME_NO_ARGUMENTS | UnDecorateFlags.UNDNAME_NO_LEADING_UNDERSCORES);
 
                     string result = output.ToString();
 
@@ -134,10 +134,10 @@ namespace RobloxClientTracker
                     foreach (string complex in TypeSimplify.Keys)
                     {
                         string simple = TypeSimplify[complex];
-                        result = result.Replace(complex, simple);
+                        result = result.Replace(complex, simple, Program.InvariantString);
                     }
 
-                    lines.Add(result.Substring(6));
+                    lines.Add(result[6..]);
                 }
             }
 

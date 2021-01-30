@@ -7,7 +7,7 @@ namespace RobloxClientTracker
 {
     public class HistoryCache
     {
-        private static Dictionary<string, HistoryCache> BranchCache = new Dictionary<string, HistoryCache>();
+        private static readonly Dictionary<string, HistoryCache> BranchCache = new Dictionary<string, HistoryCache>();
 
         public string Branch { get; private set; }
         public string History { get; private set; }

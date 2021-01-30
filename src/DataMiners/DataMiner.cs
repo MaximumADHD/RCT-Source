@@ -47,16 +47,16 @@ namespace RobloxClientTracker
         protected static string sanitizeString(string str)
         {
             string sanitized = str?
-                .Replace("\r\r", "\r")
-                .Replace("\n", "\r\n")
-                .Replace("\r\r", "\r");
+                .Replace("\r\r", "\r", Program.InvariantString)
+                .Replace("\n", "\r\n", Program.InvariantString)
+                .Replace("\r\r", "\r", Program.InvariantString);
 
             return sanitized;
         }
 
         protected static string localPath(string globalPath)
         {
-            return globalPath.Substring(stageDir.Length + 1);
+            return globalPath[(stageDir.Length + 1)..];
         }
         
         protected static void writeFile(string path, string contents)

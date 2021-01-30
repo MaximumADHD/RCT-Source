@@ -7,7 +7,7 @@ namespace RobloxClientTracker
     {
         public override ConsoleColor LogColor => ConsoleColor.Cyan;
 
-        private string[] contentFolders = new string[]
+        private readonly string[] contentFolders = new string[]
         {
             "avatar",
             "configs",
@@ -35,16 +35,16 @@ namespace RobloxClientTracker
 
             foreach (string file in Directory.GetFiles(destFolder, "*.*", SearchOption.AllDirectories))
             {
-                if (file.EndsWith(".rbxm") || file.EndsWith(".rbxmx"))
+                if (file.EndsWith(".rbxm", Program.InvariantString) || file.EndsWith(".rbxmx", Program.InvariantString))
                 {
                     print($"\t\tUnpacking {localPath(file)}");
                     unpackFile(file, false);
                 }
-                else if (file.EndsWith(".sig") || file.EndsWith(".mesh"))
+                else if (file.EndsWith(".sig", Program.InvariantString) || file.EndsWith(".mesh", Program.InvariantString))
                 {
                     File.Delete(file);
                 }
-                else if (file.EndsWith(".lua"))
+                else if (file.EndsWith(".lua", Program.InvariantString))
                 {
                     string source = File.ReadAllText(file);
                     string newSource = sanitizeString(source);

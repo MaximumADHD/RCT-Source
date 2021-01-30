@@ -7,7 +7,7 @@ namespace RobloxClientTracker
     {
         public override ConsoleColor LogColor => ConsoleColor.Cyan;
 
-        private static string[] pluginFolders = new string[]
+        private static readonly string[] pluginFolders = new string[]
         {
             "BuiltInPlugins",
             "BuiltInStandalonePlugins"
@@ -34,7 +34,7 @@ namespace RobloxClientTracker
 
             foreach (string file in Directory.GetFiles(destFolder))
             {
-                if (file.EndsWith(".rbxm") || file.EndsWith(".rbxmx"))
+                if (file.EndsWith(".rbxm", Program.InvariantString) || file.EndsWith(".rbxmx", Program.InvariantString))
                 {
                     print($"\t\tUnpacking {localPath(file)}");
                     unpackFile(file, true);

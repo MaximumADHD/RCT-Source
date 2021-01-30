@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Diagnostics;
+using System.Diagnostics.Contracts;
 using System.Globalization;
 using System.IO;
 using System.Text.RegularExpressions;
@@ -30,8 +31,8 @@ namespace RobloxClientTracker
         public ShaderType ShaderType { get; set; }
         public string Group { get; set; }
 
-        public byte[] Stub;
-        public byte[] Buffer;
+        public byte[] Stub { get; set; }
+        public byte[] Buffer { get; set; }
 
         public int Level { get; set; }
 
@@ -68,23 +69,24 @@ namespace RobloxClientTracker
                 if (Name == other.Name && Level != other.Level)
                     return Level - other.Level;
 
-                return string.Compare(Id, other.Id, StringComparison.InvariantCulture);
+                return string.Compare(Id, other.Id, Program.InvariantString);
             }
 
-            return string.Compare(Id, obj?.ToString(), StringComparison.InvariantCulture);
+            return string.Compare(Id, obj?.ToString(), Program.InvariantString);
         }
 
         public void WriteFile(UnpackShaders unpacker, string dir, RegistryKey container)
         {
+            Contract.Requires(unpacker != null);
             string contents = Program.UTF8.GetString(Buffer);
 
-            if (contents.StartsWith("#version"))
+            if (contents.StartsWith("#version", Program.InvariantString))
             {
                 var enumType = typeof(ShaderType);
 
                 string extension = Enum.GetName(enumType, ShaderType)
                     .Substring(0, 4)
-                    .ToLower(CultureInfo.InvariantCulture);
+                    .ToLower(Program.Invariant);
 
                 string shaderPath = Path.Combine(dir, Id + '.' + extension);
                 var names = new List<int>();
@@ -96,16 +98,16 @@ namespace RobloxClientTracker
                 {
                     string str = variable
                         .ToString()
-                        .Substring(1);
+                        [1..];
 
-                    int value = int.Parse(str, CultureInfo.InvariantCulture);
+                    int value = int.Parse(str, Program.Invariant);
                     string name = extension.Substring(0, 1);
 
                     if (!names.Contains(value))
                         names.Add(value);
 
                     name += names.IndexOf(value);
-                    contents = contents.Replace("_" + str, name);
+                    contents = contents.Replace("_" + str, name, Program.InvariantString);
                 }
 
                 foreach (Match match in structs.Matches(contents))
@@ -122,10 +124,10 @@ namespace RobloxClientTracker
 
                     string line = $"#include <{structName}.h>\n";
 
-                    if (!contents.Contains(extendGL))
+                    if (!contents.Contains(extendGL, Program.InvariantString))
                         line = extendGL + "\n" + line;
 
-                    contents = contents.Replace(fullStruct, line);
+                    contents = contents.Replace(fullStruct, line, Program.InvariantString);
                 }
 
                 string currentHash = container.GetString(RegistryKey);
@@ -136,6 +138,52 @@ namespace RobloxClientTracker
                     unpacker.WriteShader(shaderPath, contents);
                 }
             }
+        }
+
+        public override bool Equals(object obj)
+        {
+            if (obj is ShaderFile file)
+                return Hash == file.Hash;
+
+            return false;
+        }
+
+        public override int GetHashCode()
+        {
+            return Hash.GetHashCode(Program.InvariantString);
+        }
+
+        public static bool operator ==(ShaderFile left, ShaderFile right)
+        {
+            if (left is null)
+                return right is null;
+            
+            return left.Equals(right);
+        }
+
+        public static bool operator !=(ShaderFile left, ShaderFile right)
+        {
+            return !(left == right);
+        }
+
+        public static bool operator <(ShaderFile left, ShaderFile right)
+        {
+            return left is null ? right is null : left.CompareTo(right) < 0;
+        }
+
+        public static bool operator <=(ShaderFile left, ShaderFile right)
+        {
+            return left is null || left.CompareTo(right) <= 0;
+        }
+
+        public static bool operator >(ShaderFile left, ShaderFile right)
+        {
+            return !(left is null) && left.CompareTo(right) > 0;
+        }
+
+        public static bool operator >=(ShaderFile left, ShaderFile right)
+        {
+            return left is null ? right is null : left.CompareTo(right) >= 0;
         }
     }
 }

@@ -11,9 +11,7 @@ namespace RobloxClientTracker
         private const string LogPattern = "New (Studio6?4?) (version-[a-f\\d]+) at \\d+/\\d+/\\d+ \\d+:\\d+:\\d+ [A,P]M, file version: (\\d+), (\\d+), (\\d+), (\\d+)...Done!";
 
         public string Branch { get; private set; }
-
-        private string LastDeployHistory = "";
-        private static Dictionary<string, StudioDeployLogs> LogCache = new Dictionary<string, StudioDeployLogs>();
+        private static readonly Dictionary<string, StudioDeployLogs> LogCache = new Dictionary<string, StudioDeployLogs>();
 
         public HashSet<DeployLog> CurrentLogs_x86 { get; private set; } = new HashSet<DeployLog>();
         public HashSet<DeployLog> CurrentLogs_x64 { get; private set; } = new HashSet<DeployLog>();
@@ -74,11 +72,8 @@ namespace RobloxClientTracker
             string deployHistory = await HistoryCache.GetDeployHistory(branch, init || refresh);
             
             if (init || refresh)
-            {
-                logs.LastDeployHistory = deployHistory;
                 logs.UpdateLogs(deployHistory);
-            }
-
+            
             return logs;
         }
     }

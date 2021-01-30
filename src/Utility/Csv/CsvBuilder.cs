@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Diagnostics.Contracts;
 using System.IO;
 using System.Linq;
 
@@ -9,6 +10,8 @@ namespace RobloxClientTracker
     {
         public static string Convert(string file, IEnumerable<string> headers)
         {
+            Contract.Requires(file != null);
+
             int column = 0;
             int numColumns = headers.Count();
 
@@ -43,6 +46,8 @@ namespace RobloxClientTracker
 
         public static void Convert(string path, string[] headers, Action<string> callback)
         {
+            Contract.Requires(callback != null);
+
             if (!File.Exists(path))
             {
                 Program.print("Missing CSV file: " + path, ConsoleColor.Red);
@@ -56,12 +61,6 @@ namespace RobloxClientTracker
         }
 
         public static string Convert(IEnumerable<string> lines, params string[] headers)
-        {
-            string file = string.Join("\r\n", lines);
-            return Convert(file, headers);
-        }
-
-        public static string Convert(IEnumerable<string> lines, string[] headers, Action<string> callback)
         {
             string file = string.Join("\r\n", lines);
             return Convert(file, headers);

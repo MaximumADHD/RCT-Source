@@ -12,7 +12,7 @@ namespace RobloxClientTracker
     {
         public override ConsoleColor LogColor => ConsoleColor.Magenta;
 
-        private static Dictionary<string, byte[]> luaFiles = new Dictionary<string, byte[]>
+        private static readonly IReadOnlyDictionary<string, byte[]> luaFiles = new Dictionary<string, byte[]>
         {
             { "BinaryReader.lua",  Resources.BinaryReader_lua },
             { "QtExtract.lua",     Resources.QtExtract_lua    },
@@ -32,7 +32,7 @@ namespace RobloxClientTracker
                 {
                     string fullPath = Path.Combine(dir, entry.FullName);
 
-                    if (fullPath.EndsWith("/"))
+                    if (fullPath.EndsWith("/", Program.InvariantString))
                     {
                         Directory.CreateDirectory(fullPath);
                         continue;
@@ -75,22 +75,20 @@ namespace RobloxClientTracker
             };
 
             print("Extracting Qt Resources...");
+            using Process process = Process.Start(extract);
 
-            using (Process process = Process.Start(extract))
+            process.WaitForExit();
+            process.Close();
+
+            foreach (string file in Directory.GetFiles(extractDir, "*.xml", SearchOption.AllDirectories))
             {
-                process.WaitForExit();
-                process.Close();
+                FileInfo info = new FileInfo(file);
+                string newPath = Path.Combine(stageDir, info.Name);
 
-                foreach (string file in Directory.GetFiles(extractDir, "*.xml", SearchOption.AllDirectories))
-                {
-                    FileInfo info = new FileInfo(file);
-                    string newPath = Path.Combine(stageDir, info.Name);
+                if (File.Exists(newPath))
+                    File.Delete(newPath);
 
-                    if (File.Exists(newPath))
-                        File.Delete(newPath);
-
-                    File.Move(file, newPath);
-                }
+                File.Move(file, newPath);
             }
         }
     }

@@ -7,8 +7,6 @@ using Microsoft.Win32;
 
 public static class Extensions
 {
-    private static CultureInfo invariant => CultureInfo.InvariantCulture;
-
     public static RegistryKey Open(this RegistryKey start, params string[] traversal)
     {
         RegistryKey current = start;

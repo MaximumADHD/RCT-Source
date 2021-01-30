@@ -5,30 +5,22 @@ using System.Reflection;
 
 using RobloxFiles;
 using Newtonsoft.Json;
+using System.Diagnostics.Contracts;
 
 namespace RobloxClientTracker
 {
-    public class CsvLocalizationTable : List<CsvLocalizationTable.Entry>
+    public class CsvLocalizationTable : List<CsvLocalizationEntry>
     {
-        public struct Entry
-        {
-            public string Key;
-            public string Source;
-            public string Context;
-            public string Example;
-
-            public Dictionary<string, string> Values;
-        }
-        
         public CsvLocalizationTable(LocalizationTable table)
         {
+            Contract.Requires(table != null);
             string contents = table.Contents;
             JsonConvert.PopulateObject(contents, this);
         }
 
         public string WriteCsv()
         {
-            Type entryType = typeof(Entry);
+            Type entryType = typeof(CsvLocalizationEntry);
 
             // Select all distinct language definitions from the table entries.
             string[] languages = this
@@ -79,12 +71,12 @@ namespace RobloxClientTracker
                     if (value == null)
                         value = " ";
 
-                    if (value.Contains(","))
+                    if (value.Contains(",", Program.InvariantString))
                     {
-                        if (value.Contains("\""))
+                        if (value.Contains("\"", Program.InvariantString))
                         {
-                            value = value.Replace("\"", "\\\"");
-                            value = value.Replace("\\\\\"", "\\\"");
+                            value = value.Replace("\"", "\\\"", Program.InvariantString);
+                            value = value.Replace("\\\\\"", "\\\"", Program.InvariantString);
                         }
 
                         value = '"' + value + '"';

@@ -46,10 +46,8 @@ namespace RobloxClientTracker
         {
             Contract.Requires(inst != null);
 
-            if (inst.IsA<LuaSourceContainer>())
+            if (inst is LuaSourceContainer luaFile)
             {
-                var luaFile = inst.Cast<LuaSourceContainer>();
-
                 switch (luaFile.ClassName)
                 {
                     case "Script":
@@ -71,19 +69,16 @@ namespace RobloxClientTracker
 
                 value = luaFile.Source;
             }
-            else if (inst.IsA<StringValue>() && inst.Name != "AvatarPartScaleType")
+            else if (inst is StringValue str && inst.Name != "AvatarPartScaleType")
             {
-                var str = inst.Cast<StringValue>();
                 extension = ".txt";
                 value = str.Value;
             }
-            else if (inst.IsA<LocalizationTable>())
+            else if (inst is LocalizationTable table)
             {
-                var table = inst.Cast<LocalizationTable>();
                 var csvTable = new CsvLocalizationTable(table);
-
-                extension = ".csv";
                 value = csvTable.WriteCsv();
+                extension = ".csv";
             }
 
             value = sanitizeString(value);
@@ -122,7 +117,7 @@ namespace RobloxClientTracker
             {
                 RobloxFile file = RobloxFile.Open(filePath);
 
-                string projectName = info.Name.Replace(info.Extension, "");
+                string projectName = info.Name.Replace(info.Extension, "", Program.InvariantString);
                 string regKey = info.Directory.Name + '/' + projectName;
 
                 if (delete)
