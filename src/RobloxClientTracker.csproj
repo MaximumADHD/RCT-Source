@@ -46,7 +46,6 @@
   </ItemGroup>
 
   <ItemGroup>
-    <Folder Include="Bootstrapper\" />
     <Folder Include="DataMiners\Routines\" />
   </ItemGroup>
 
@@ -68,6 +67,7 @@
   <ItemGroup>
     <ProjectReference Include="..\..\Roblox-API-Dump-Tool\RobloxApiDumpTool.csproj" />
     <ProjectReference Include="..\..\Roblox-File-Format\RobloxFileFormat.csproj" />
+    <ProjectReference Include="..\..\Roblox-Studio-Mod-Manager\ProjectSrc\RobloxStudioModManager.csproj" />
   </ItemGroup>
 
   <ItemGroup>

@@ -3,11 +3,12 @@ This is the backend console application that drives the Roblox-Client-Tracker re
 
 # Setup
 For this to run correctly, you need a Git CLI for the program to communicate with.<br/>
-I personally use git-scm: https://git-scm.com/
+If you happen to not have that, you can find one here: https://git-scm.com/
 
 You'll need to fork these projects into the parent directory of this repository:<br/>
 (Make sure you get them building with their NuGet packages fetched!)
 
+- https://github.com/CloneTrooper1019/Roblox-Studio-Mod-Manager
 - https://github.com/CloneTrooper1019/Roblox-API-Dump-Tool
 - https://github.com/CloneTrooper1019/Roblox-File-Format
 

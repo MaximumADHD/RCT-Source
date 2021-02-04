@@ -18,6 +18,8 @@ using Newtonsoft.Json.Linq;
 using CliWrap;
 using CliWrap.EventStream;
 
+using RobloxStudioModManager;
+
 namespace RobloxClientTracker
 {
     static class Program
@@ -136,7 +138,7 @@ namespace RobloxClientTracker
 
         public static string trunk { get; private set; }
         public static string stageDir { get; private set; }
-
+        public static string studioDir { get; private set; }
         public static string studioPath { get; private set; }
         public static StudioBootstrapper studio { get; private set; }
 
@@ -436,8 +438,19 @@ namespace RobloxClientTracker
             }
 
             // Setup studio bootstrapper.
-            studio = new StudioBootstrapper(branch);
+            studioDir = createDirectory(trunk, "builds", branch);
+
+            studio = new StudioBootstrapper(BranchRegistry)
+            {
+                Branch = branch,
+                GenerateMetadata = true,
+                CanShutdownStudio = false,
+                OverrideStudioDirectory = studioDir
+            };
+
             studioPath = studio.GetStudioPath();
+            studio.EchoFeed += new MessageEventHandler((sender, e) => print(e.Message, YELLOW));
+            studio.StatusChanged += new MessageEventHandler((sender, e) => print(e.Message, MAGENTA));
 
             // Setup data miner tasks.
             var dataMiners = AppDomain.CurrentDomain
@@ -552,11 +565,10 @@ namespace RobloxClientTracker
                     if (!MANUAL_BUILD)
                     {
                         print("Syncing Roblox Studio...", GREEN);
-                        await studio.UpdateStudio();
+                        await studio.Bootstrap();
                     }
 
                     // Copy some metadata generated during the studio installation.
-                    string studioDir = studio.GetStudioDirectory();
 
                     foreach (string fileName in filesToCopy)
                     {
