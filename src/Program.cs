@@ -15,9 +15,6 @@ using RobloxClientTracker.Properties;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 
-using CliWrap;
-using CliWrap.EventStream;
-
 using RobloxStudioModManager;
 
 namespace RobloxClientTracker
@@ -133,6 +130,15 @@ namespace RobloxClientTracker
             { "U", GRAY    },
         };
 
+        static readonly ProcessStartInfo gitExecute = new ProcessStartInfo
+        {
+            FileName = "git",
+            CreateNoWindow = true,
+            UseShellExecute = false,
+            RedirectStandardError = true,
+            RedirectStandardOutput = true,
+        };
+
         static string branch = "roblox";
         static string parent = "roblox";
 
@@ -171,60 +177,51 @@ namespace RobloxClientTracker
 
         public static IEnumerable<string> git(params string[] args)
         {
-            var cout = new List<string>();
-            var arguments = string.Join(' ', args);
+            Directory.SetCurrentDirectory(stageDir);
 
-            var command = Cli.Wrap("git")
-                .WithValidation(CommandResultValidation.None)
-                .WithWorkingDirectory(stageDir)
-                .WithArguments(arguments);
-            
-            var execute = Task.Run(async () =>
+            string command = string.Join(" ", args);
+            Process git;
+
+            lock (gitExecute)
             {
-                if (VERBOSE_GIT_LOGS)
-                    print($"> git {arguments}");
-                
-                try
+                gitExecute.Arguments = command;
+                git = Process.Start(gitExecute);
+            }
+
+            if (VERBOSE_GIT_LOGS)
+                print($"> git {command}");
+
+            List<string> outLines = new List<string>();
+
+            var processOutput = new Action<string, bool>((message, isError) =>
+            {
+                if (message != null && message.Length > 0)
                 {
-                    await foreach (var cmdEvent in command.ListenAsync())
+                    lock (outLines)
                     {
-                        bool isError = false;
-                        string message = null;
-
-                        switch (cmdEvent)
+                        if (VERBOSE_GIT_LOGS || isError)
                         {
-                            case StandardErrorCommandEvent stdErr:
-                                message = stdErr.Text;
-                                isError = true;
-                                break;
-                            case StandardOutputCommandEvent stdOut:
-                                message = stdOut.Text;
-                                break;
-
-                            default: break;
+                            log("[git] ", MAGENTA);
+                            print(message, isError ? RED : WHITE);
                         }
 
-                        if (message != null)
-                        {
-                            if (VERBOSE_GIT_LOGS || isError)
-                            {
-                                log("[git] ", MAGENTA);
-                                print(message, isError ? RED : WHITE);
-                            }
-
-                            cout.Add(message);
-                        }
+                        outLines.Add(message);
                     }
-                }
-                catch (Exception e)
-                {
-                    print($"An error occurred while executing 'git {arguments}'!", RED);
-                    print($"{e.Message} {e.StackTrace}", RED);
                 }
             });
 
-            execute.Wait();
-            return cout;
+            git.ErrorDataReceived += new DataReceivedEventHandler
+                ((sender, evt) => processOutput(evt.Data, true));
+
+            git.OutputDataReceived += new DataReceivedEventHandler
+                ((sender, evt) => processOutput(evt.Data, false));
+            
+            git.BeginOutputReadLine();
+            git.BeginErrorReadLine();
+
+            git.WaitForExit();
+
+            return outLines;
         }
 
         static List<string> getChangedFiles(string filter)
@@ -232,12 +229,12 @@ namespace RobloxClientTracker
             var query = git("status", "-s");
             var result = new List<string>();
 
-            string pattern = filter.Replace("*", ".*", Program.InvariantString);
+            string pattern = filter.Replace("*", ".*");
 
             foreach (string line in query)
             {
                 string type = line.Substring(0, 2).Trim();
-                string file = line[3..];
+                string file = line.Substring(3);
 
                 if (!Regex.IsMatch(file, pattern))
                     continue;
@@ -295,7 +292,7 @@ namespace RobloxClientTracker
 
                     if (branch != "roblox")
                     {
-                        if (boringFiles.Contains(fileInfo.Name) || fileInfo.Extension.Contains("rbx", InvariantString))
+                        if (boringFiles.Contains(fileInfo.Name) || fileInfo.Extension.Contains("rbx"))
                         {
                             boringCount++;
                             continue;
@@ -448,7 +445,7 @@ namespace RobloxClientTracker
                 OverrideStudioDirectory = studioDir
             };
 
-            studioPath = studio.GetStudioPath();
+            studioPath = studio.GetLocalStudioPath();
             studio.EchoFeed += new MessageEventHandler((sender, e) => print(e.Message, YELLOW));
             studio.StatusChanged += new MessageEventHandler((sender, e) => print(e.Message, MAGENTA));
 
@@ -504,10 +501,10 @@ namespace RobloxClientTracker
                         {
                             if (result.StartsWith("CONFLICT", InvariantString))
                             {
-                                int splitPos = result.IndexOf(':', InvariantString) + 1;
+                                int splitPos = result.IndexOf(':') + 1;
 
                                 string prefix = result.Substring(0, splitPos);
-                                string msg = result[splitPos..];
+                                string msg = result.Substring(splitPos);
 
                                 log(prefix, RED);
                                 print(msg, WHITE);
@@ -697,54 +694,56 @@ namespace RobloxClientTracker
                             json = await http.DownloadStringTaskAsync(fflagEndpoint + platform);
                         }
 
-                        using var jsonText = new StringReader(json);
-                        JsonTextReader reader = new JsonTextReader(jsonText);
-
-                        JObject root = JObject.Load(reader);
-                        JObject appSettings = root.Value<JObject>("applicationSettings");
-
-                        var keys = new List<string>();
-
-                        foreach (var pair in appSettings)
-                            keys.Add(pair.Key);
-
-                        var result = new StringBuilder();
-                        int testInt = 0;
-
-                        result.AppendLine("{");
-                        keys.Sort();
-
-                        for (int i = 0; i < keys.Count; i++)
+                        using (var jsonText = new StringReader(json))
                         {
-                            string key = keys[i];
+                            JsonTextReader reader = new JsonTextReader(jsonText);
 
-                            string value = appSettings.Value<string>(key);
-                            string lower = value.ToLowerInvariant();
+                            JObject root = JObject.Load(reader);
+                            JObject appSettings = root.Value<JObject>("applicationSettings");
 
-                            if (i != 0)
-                                result.Append(",\r\n");
+                            var keys = new List<string>();
 
-                            if (lower == "true" || lower == "false")
-                                value = lower;
-                            else if (!int.TryParse(value, out testInt))
-                                value = '"' + value.Replace("\"", "\\\"", InvariantString) + '"';
+                            foreach (var pair in appSettings)
+                                keys.Add(pair.Key);
 
-                            result.Append($"\t\"{key}\": {value}");
-                        }
+                            var result = new StringBuilder();
+                            int testInt = 0;
 
-                        result.Append("\r\n}");
+                            result.AppendLine("{");
+                            keys.Sort();
 
-                        string filePath = Path.Combine(stageDir, platform + ".json");
-                        string newFile = result.ToString();
-                        string oldFile = "";
+                            for (int i = 0; i < keys.Count; i++)
+                            {
+                                string key = keys[i];
 
-                        if (File.Exists(filePath))
-                            oldFile = File.ReadAllText(filePath);
+                                string value = appSettings.Value<string>(key);
+                                string lower = value.ToLowerInvariant();
 
-                        if (oldFile != newFile)
-                        {
-                            print($"\tUpdating {platform}.json ...", YELLOW);
-                            File.WriteAllText(filePath, newFile);
+                                if (i != 0)
+                                    result.Append(",\r\n");
+
+                                if (lower == "true" || lower == "false")
+                                    value = lower;
+                                else if (!int.TryParse(value, out testInt))
+                                    value = '"' + value.Replace("\"", "\\\"") + '"';
+
+                                result.Append($"\t\"{key}\": {value}");
+                            }
+
+                            result.Append("\r\n}");
+
+                            string filePath = Path.Combine(stageDir, platform + ".json");
+                            string newFile = result.ToString();
+                            string oldFile = "";
+
+                            if (File.Exists(filePath))
+                                oldFile = File.ReadAllText(filePath);
+
+                            if (oldFile != newFile)
+                            {
+                                print($"\tUpdating {platform}.json ...", YELLOW);
+                                File.WriteAllText(filePath, newFile);
+                            }
                         }
                     });
 

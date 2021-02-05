@@ -27,7 +27,7 @@ public static class Extensions
         byte[] sequence = reader?.ReadBytes(bufferSize);
         string value = Encoding.UTF8.GetString(sequence);
 
-        int length = value.IndexOf('\0', StringComparison.InvariantCulture);
+        int length = value.IndexOf('\0');
         value = (length > 0 ? value.Substring(0, length) : value);
 
         return value;

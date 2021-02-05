@@ -28,7 +28,7 @@ namespace RobloxClientTracker
 
         public override void ExecuteRoutine()
         {
-            string studioDir = studio.GetStudioDirectory();
+            string studioDir = studio.GetLocalStudioDirectory();
             string shaderDir = Path.Combine(studioDir, "shaders");
 
             var names = new List<string>();
@@ -53,7 +53,7 @@ namespace RobloxClientTracker
                 ShaderPack pack = new ShaderPack(shaderPath);
                 var myShaders = new Dictionary<string, string>();
 
-                string name = pack.Name.Replace("shaders_", "", Program.InvariantString);
+                string name = pack.Name.Replace("shaders_", "");
                 names.Add(name);
 
                 List<ShaderFile> shaderFiles = pack.Shaders.ToList();

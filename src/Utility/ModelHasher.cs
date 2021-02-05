@@ -15,10 +15,12 @@ namespace RobloxClientTracker
         private static string hashBase64(string data)
         {
             byte[] buffer = Encoding.UTF8.GetBytes(data);
-            using MD5 md5 = MD5.Create();
 
-            byte[] hash = md5.ComputeHash(buffer);
-            return Convert.ToBase64String(hash);
+            using (MD5 md5 = MD5.Create())
+            {
+                byte[] hash = md5.ComputeHash(buffer);
+                return Convert.ToBase64String(hash);
+            }
         }
 
         public static string GetFileHash(RobloxFile file)
@@ -42,9 +44,9 @@ namespace RobloxClientTracker
                     string path = inst.GetFullName("\\");
 
                     if (path.StartsWith(prefix, Program.InvariantString))
-                        path = path[prefix.Length..];
+                        path = path.Substring(prefix.Length);
 
-                    if (path.Contains("Packages\\", Program.InvariantString))
+                    if (path.Contains("Packages\\"))
                         continue;
 
                     string hash = hashBase64(path + "\r\n" + value);

@@ -71,12 +71,12 @@ namespace RobloxClientTracker
                     if (value == null)
                         value = " ";
 
-                    if (value.Contains(",", Program.InvariantString))
+                    if (value.Contains(","))
                     {
-                        if (value.Contains("\"", Program.InvariantString))
+                        if (value.Contains("\""))
                         {
-                            value = value.Replace("\"", "\\\"", Program.InvariantString);
-                            value = value.Replace("\\\\\"", "\\\"", Program.InvariantString);
+                            value = value.Replace("\"", "\\\"");
+                            value = value.Replace("\\\\\"", "\\\"");
                         }
 
                         value = '"' + value + '"';

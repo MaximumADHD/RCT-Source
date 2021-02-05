@@ -19,7 +19,7 @@ namespace RobloxClientTracker
         // Protected utility fields for the derived classes to use.
         protected static StudioBootstrapper studio => Program.studio;
 
-        protected static string studioDir => studio.GetStudioDirectory();
+        protected static string studioDir => studio.GetLocalStudioDirectory();
         protected static string studioPath => Program.studioPath;
         
         protected static string stageDir => Program.stageDir;
@@ -48,16 +48,16 @@ namespace RobloxClientTracker
         protected static string sanitizeString(string str)
         {
             string sanitized = str?
-                .Replace("\r\r", "\r", Program.InvariantString)
-                .Replace("\n", "\r\n", Program.InvariantString)
-                .Replace("\r\r", "\r", Program.InvariantString);
+                .Replace("\r\r", "\r")
+                .Replace("\n", "\r\n")
+                .Replace("\r\r", "\r");
 
             return sanitized;
         }
 
         protected static string localPath(string globalPath)
         {
-            return globalPath[(stageDir.Length + 1)..];
+            return globalPath.Substring(stageDir.Length + 1);
         }
         
         protected static void writeFile(string path, string contents)

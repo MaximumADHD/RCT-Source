@@ -1,84 +1,167 @@
-﻿<Project Sdk="Microsoft.NET.Sdk">
-
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="15.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <Import Project="$(MSBuildExtensionsPath)\$(MSBuildToolsVersion)\Microsoft.Common.props" Condition="Exists('$(MSBuildExtensionsPath)\$(MSBuildToolsVersion)\Microsoft.Common.props')" />
   <PropertyGroup>
+    <Configuration Condition=" '$(Configuration)' == '' ">Debug</Configuration>
+    <Platform Condition=" '$(Platform)' == '' ">AnyCPU</Platform>
+    <ProjectGuid>{D36B7841-7B08-48A1-A6C2-D28B225B8269}</ProjectGuid>
     <OutputType>Exe</OutputType>
-    <TargetFramework>netcoreapp3.1</TargetFramework>
-    <Win32Resource>Resources/Icons.res</Win32Resource>
-    <Platforms>AnyCPU;x64</Platforms>
-    <StartupObject></StartupObject>
-    <RunAnalyzersDuringBuild>false</RunAnalyzersDuringBuild>
+    <RootNamespace>RobloxClientTracker</RootNamespace>
+    <AssemblyName>RobloxClientTracker</AssemblyName>
+    <TargetFrameworkVersion>v4.7.2</TargetFrameworkVersion>
+    <FileAlignment>512</FileAlignment>
+    <AutoGenerateBindingRedirects>true</AutoGenerateBindingRedirects>
+    <Deterministic>true</Deterministic>
   </PropertyGroup>
-
+  <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|AnyCPU' ">
+    <PlatformTarget>AnyCPU</PlatformTarget>
+    <DebugSymbols>true</DebugSymbols>
+    <DebugType>full</DebugType>
+    <Optimize>false</Optimize>
+    <OutputPath>bin\Debug\</OutputPath>
+    <DefineConstants>DEBUG;TRACE</DefineConstants>
+    <ErrorReport>prompt</ErrorReport>
+    <WarningLevel>4</WarningLevel>
+  </PropertyGroup>
+  <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Release|AnyCPU' ">
+    <PlatformTarget>AnyCPU</PlatformTarget>
+    <DebugType>pdbonly</DebugType>
+    <Optimize>true</Optimize>
+    <OutputPath>bin\Release\</OutputPath>
+    <DefineConstants>TRACE</DefineConstants>
+    <ErrorReport>prompt</ErrorReport>
+    <WarningLevel>4</WarningLevel>
+  </PropertyGroup>
+  <PropertyGroup>
+    <Win32Resource>Resources/Icons.res</Win32Resource>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)' == 'Debug|x64'">
+    <DebugSymbols>true</DebugSymbols>
+    <OutputPath>bin\x64\Debug\</OutputPath>
+    <DefineConstants>DEBUG;TRACE</DefineConstants>
+    <DebugType>full</DebugType>
+    <PlatformTarget>x64</PlatformTarget>
+    <LangVersion>7.3</LangVersion>
+    <ErrorReport>prompt</ErrorReport>
+    <Prefer32Bit>true</Prefer32Bit>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)' == 'Release|x64'">
+    <OutputPath>bin\x64\Release\</OutputPath>
+    <DefineConstants>TRACE</DefineConstants>
+    <Optimize>true</Optimize>
+    <DebugType>pdbonly</DebugType>
+    <PlatformTarget>x64</PlatformTarget>
+    <LangVersion>7.3</LangVersion>
+    <ErrorReport>prompt</ErrorReport>
+    <Prefer32Bit>true</Prefer32Bit>
+  </PropertyGroup>
   <ItemGroup>
-    <None Remove="Resources\Lua\BinaryReader.lua" />
-    <None Remove="Resources\Lua\Bit.lua" />
-    <None Remove="Resources\Lua\Deflate.lua" />
-    <None Remove="Resources\Lua\PEParser.lua" />
-    <None Remove="Resources\Lua\QtExtract.lua" />
+    <Reference Include="Newtonsoft.Json, Version=12.0.0.0, Culture=neutral, PublicKeyToken=30ad4fe6b2a6aeed, processorArchitecture=MSIL">
+      <HintPath>..\packages\Newtonsoft.Json.12.0.3\lib\net45\Newtonsoft.Json.dll</HintPath>
+    </Reference>
+    <Reference Include="System" />
+    <Reference Include="System.Buffers, Version=4.0.3.0, Culture=neutral, PublicKeyToken=cc7b13ffcd2ddd51, processorArchitecture=MSIL">
+      <HintPath>..\packages\System.Buffers.4.5.1\lib\net461\System.Buffers.dll</HintPath>
+    </Reference>
+    <Reference Include="System.Diagnostics.Process, Version=4.1.1.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a, processorArchitecture=MSIL">
+      <HintPath>..\packages\System.Diagnostics.Process.4.3.0\lib\net461\System.Diagnostics.Process.dll</HintPath>
+      <Private>True</Private>
+      <Private>True</Private>
+    </Reference>
+    <Reference Include="System.IO.Compression" />
+    <Reference Include="System.IO.Compression.FileSystem" />
+    <Reference Include="System.Net" />
+    <Reference Include="System.Runtime.CompilerServices.Unsafe, Version=4.0.4.1, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a, processorArchitecture=MSIL">
+      <HintPath>..\packages\System.Runtime.CompilerServices.Unsafe.4.5.3\lib\net461\System.Runtime.CompilerServices.Unsafe.dll</HintPath>
+    </Reference>
+    <Reference Include="System.Runtime.InteropServices.RuntimeInformation, Version=4.0.1.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a, processorArchitecture=MSIL">
+      <HintPath>..\packages\System.Runtime.InteropServices.RuntimeInformation.4.3.0\lib\net45\System.Runtime.InteropServices.RuntimeInformation.dll</HintPath>
+      <Private>True</Private>
+      <Private>True</Private>
+    </Reference>
+    <Reference Include="System.Text.RegularExpressions, Version=4.1.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a, processorArchitecture=MSIL">
+      <HintPath>..\packages\System.Text.RegularExpressions.4.3.1\lib\net463\System.Text.RegularExpressions.dll</HintPath>
+      <Private>True</Private>
+      <Private>True</Private>
+    </Reference>
+    <Reference Include="System.Threading.Tasks.Extensions, Version=4.2.0.1, Culture=neutral, PublicKeyToken=cc7b13ffcd2ddd51, processorArchitecture=MSIL">
+      <HintPath>..\packages\System.Threading.Tasks.Extensions.4.5.4\lib\net461\System.Threading.Tasks.Extensions.dll</HintPath>
+    </Reference>
+    <Reference Include="System.ValueTuple, Version=4.0.3.0, Culture=neutral, PublicKeyToken=cc7b13ffcd2ddd51, processorArchitecture=MSIL">
+      <HintPath>..\packages\System.ValueTuple.4.5.0\lib\net47\System.ValueTuple.dll</HintPath>
+    </Reference>
   </ItemGroup>
-
   <ItemGroup>
-    <EmbeddedResource Include="Resources\Lua\BinaryReader.lua" />
-    <EmbeddedResource Include="Resources\Lua\Bit.lua" />
-    <EmbeddedResource Include="Resources\Lua\Deflate.lua" />
-    <EmbeddedResource Include="Resources\Lua\PEParser.lua" />
-    <EmbeddedResource Include="Resources\Lua\QtExtract.lua" />
-  </ItemGroup>
-
-  <ItemGroup>
-    <Compile Update="Properties\Resources.Designer.cs">
-      <DesignTime>True</DesignTime>
+    <Compile Include="DataMiners\DataMiner.cs" />
+    <Compile Include="DataMiners\MultiTaskMiner.cs" />
+    <Compile Include="DataMiners\RobloxFileMiner.cs" />
+    <Compile Include="Properties\Resources.Designer.cs">
       <AutoGen>True</AutoGen>
+      <DesignTime>True</DesignTime>
       <DependentUpon>Resources.resx</DependentUpon>
     </Compile>
-    <Compile Update="Properties\Settings.Designer.cs">
-      <DesignTimeSharedInput>True</DesignTimeSharedInput>
+    <Compile Include="Properties\Settings.Designer.cs">
       <AutoGen>True</AutoGen>
+      <DesignTimeSharedInput>True</DesignTimeSharedInput>
       <DependentUpon>Settings.settings</DependentUpon>
     </Compile>
+    <Compile Include="Routines\ConvertManifestsToCsv.cs" />
+    <Compile Include="Routines\CopyContentFolders.cs" />
+    <Compile Include="Routines\ExtractQtResources.cs" />
+    <Compile Include="Routines\ExtractStudioStrings.cs" />
+    <Compile Include="Routines\GenerateApiDump.cs" />
+    <Compile Include="Routines\ScanFastFlags.cs" />
+    <Compile Include="Routines\UnpackPlugins.cs" />
+    <Compile Include="Routines\UnpackShaders.cs" />
+    <Compile Include="Program.cs" />
+    <Compile Include="Properties\AssemblyInfo.cs" />
+    <Compile Include="Csv\CsvBuilder.cs" />
+    <Compile Include="Csv\CsvLocalizationEntry.cs" />
+    <Compile Include="Csv\CsvLocalizationTable.cs" />
+    <Compile Include="Utility\Extensions.cs" />
+    <Compile Include="Utility\FileLogConfig.cs" />
+    <Compile Include="Utility\ModelHasher.cs" />
+    <Compile Include="Shaders\ShaderFile.cs" />
+    <Compile Include="Shaders\ShaderPack.cs" />
+    <Compile Include="Utility\SystemEvent.cs" />
   </ItemGroup>
-
   <ItemGroup>
-    <EmbeddedResource Update="Properties\Resources.resx">
+    <None Include="App.config" />
+    <None Include="packages.config" />
+    <None Include="Properties\Settings.settings">
+      <Generator>SettingsSingleFileGenerator</Generator>
+      <LastGenOutput>Settings.Designer.cs</LastGenOutput>
+    </None>
+    <None Include="Resources\Icons.res" />
+    <None Include="Resources\LuaJIT.zip" />
+    <None Include="Resources\Lua\BinaryReader.lua" />
+    <None Include="Resources\Lua\Bit.lua" />
+    <None Include="Resources\Lua\Deflate.lua" />
+    <None Include="Resources\Lua\PEParser.lua" />
+    <None Include="Resources\Lua\QtExtract.lua" />
+  </ItemGroup>
+  <ItemGroup>
+    <EmbeddedResource Include="Properties\Resources.resx">
       <Generator>ResXFileCodeGenerator</Generator>
       <LastGenOutput>Resources.Designer.cs</LastGenOutput>
     </EmbeddedResource>
   </ItemGroup>
-
   <ItemGroup>
-    <Folder Include="DataMiners\Routines\" />
+    <ProjectReference Include="..\..\Roblox-API-Dump-Tool\RobloxApiDumpTool.csproj">
+      <Project>{585eab66-7c64-482d-8619-2d2eb972cfc9}</Project>
+      <Name>RobloxApiDumpTool</Name>
+    </ProjectReference>
+    <ProjectReference Include="..\..\Roblox-File-Format\RobloxFileFormat.csproj">
+      <Project>{cf50c0e2-23a7-4dc1-b4b2-e60cde716253}</Project>
+      <Name>RobloxFileFormat</Name>
+    </ProjectReference>
+    <ProjectReference Include="..\..\Roblox-Studio-Mod-Manager\ProjectSrc\RobloxStudioModManager.csproj">
+      <Project>{fad2621f-b280-4d6d-a260-f410c5b06e0c}</Project>
+      <Name>RobloxStudioModManager</Name>
+    </ProjectReference>
   </ItemGroup>
-
-  <ItemGroup>
-    <None Include="..\.editorconfig" Link=".editorconfig" />
-  </ItemGroup>
-
-  <ItemGroup>
-    <PackageReference Include="CliWrap" Version="3.1.0" />
-    <PackageReference Include="Microsoft.CodeAnalysis.FxCopAnalyzers" Version="2.9.6">
-      <PrivateAssets>all</PrivateAssets>
-      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
-    </PackageReference>
-    <PackageReference Include="Microsoft.Win32.Registry" Version="4.7.0" />
-    <PackageReference Include="Newtonsoft.Json" Version="12.0.3" />
-    <PackageReference Include="System.Configuration.ConfigurationManager" Version="4.7.0" />
-  </ItemGroup>
-
-  <ItemGroup>
-    <ProjectReference Include="..\..\Roblox-API-Dump-Tool\RobloxApiDumpTool.csproj" />
-    <ProjectReference Include="..\..\Roblox-File-Format\RobloxFileFormat.csproj" />
-    <ProjectReference Include="..\..\Roblox-Studio-Mod-Manager\ProjectSrc\RobloxStudioModManager.csproj" />
-  </ItemGroup>
-
-  <ItemGroup>
-    <None Update="Properties\Settings.settings">
-      <Generator>SettingsSingleFileGenerator</Generator>
-      <LastGenOutput>Settings.Designer.cs</LastGenOutput>
-    </None>
-  </ItemGroup>
-
-  <Target Name="PreBuild" BeforeTargets="PreBuildEvent">
-    <Exec Command="taskkill /f /im RobloxClientTracker.exe /fi &quot;memusage gt 2&quot;" />
-  </Target>
-
+  <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
+  <PropertyGroup>
+    <PreBuildEvent>taskkill /f /im RobloxClientTracker.exe /fi "memusage gt 2"</PreBuildEvent>
+  </PropertyGroup>
 </Project>

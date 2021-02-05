@@ -117,7 +117,7 @@ namespace RobloxClientTracker
             {
                 RobloxFile file = RobloxFile.Open(filePath);
 
-                string projectName = info.Name.Replace(info.Extension, "", Program.InvariantString);
+                string projectName = info.Name.Replace(info.Extension, "");
                 string regKey = info.Directory.Name + '/' + projectName;
 
                 if (delete)

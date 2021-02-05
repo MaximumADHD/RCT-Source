@@ -24,7 +24,7 @@ namespace RobloxClientTracker
 
         private void unpackPlugin(string folderName)
         {
-            string studioDir = studio.GetStudioDirectory();
+            string studioDir = studio.GetLocalStudioDirectory();
 
             string srcFolder = Path.Combine(studioDir, folderName);
             string destFolder = Path.Combine(stageDir, folderName);

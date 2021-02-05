@@ -42,7 +42,7 @@ namespace RobloxClientTracker
             {
                 string level = "";
 
-                if (Name.EndsWith('_'))
+                if (Name.EndsWith("_"))
                     level = $"Level{Level}";
 
                 return $"{Name}{level}";
@@ -98,7 +98,7 @@ namespace RobloxClientTracker
                 {
                     string str = variable
                         .ToString()
-                        [1..];
+                        .Substring(1);
 
                     int value = int.Parse(str, Program.Invariant);
                     string name = extension.Substring(0, 1);
@@ -107,7 +107,7 @@ namespace RobloxClientTracker
                         names.Add(value);
 
                     name += names.IndexOf(value);
-                    contents = contents.Replace("_" + str, name, Program.InvariantString);
+                    contents = contents.Replace("_" + str, name);
                 }
 
                 foreach (Match match in structs.Matches(contents))
@@ -124,10 +124,10 @@ namespace RobloxClientTracker
 
                     string line = $"#include <{structName}.h>\n";
 
-                    if (!contents.Contains(extendGL, Program.InvariantString))
+                    if (!contents.Contains(extendGL))
                         line = extendGL + "\n" + line;
 
-                    contents = contents.Replace(fullStruct, line, Program.InvariantString);
+                    contents = contents.Replace(fullStruct, line);
                 }
 
                 string currentHash = container.GetString(RegistryKey);
@@ -150,7 +150,7 @@ namespace RobloxClientTracker
 
         public override int GetHashCode()
         {
-            return Hash.GetHashCode(Program.InvariantString);
+            return Hash.GetHashCode();
         }
 
         public static bool operator ==(ShaderFile left, ShaderFile right)

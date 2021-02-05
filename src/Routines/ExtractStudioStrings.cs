@@ -134,10 +134,10 @@ namespace RobloxClientTracker
                     foreach (string complex in TypeSimplify.Keys)
                     {
                         string simple = TypeSimplify[complex];
-                        result = result.Replace(complex, simple, Program.InvariantString);
+                        result = result.Replace(complex, simple);
                     }
 
-                    lines.Add(result[6..]);
+                    lines.Add(result.Substring(6));
                 }
             }
 
