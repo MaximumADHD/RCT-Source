@@ -123,7 +123,6 @@
     <Compile Include="Utility\ModelHasher.cs" />
     <Compile Include="Shaders\ShaderFile.cs" />
     <Compile Include="Shaders\ShaderPack.cs" />
-    <Compile Include="Utility\SystemEvent.cs" />
   </ItemGroup>
   <ItemGroup>
     <None Include="App.config" />
@@ -144,6 +143,7 @@
     <EmbeddedResource Include="Properties\Resources.resx">
       <Generator>ResXFileCodeGenerator</Generator>
       <LastGenOutput>Resources.Designer.cs</LastGenOutput>
+      <SubType>Designer</SubType>
     </EmbeddedResource>
   </ItemGroup>
   <ItemGroup>
@@ -162,6 +162,6 @@
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
   <PropertyGroup>
-    <PreBuildEvent>taskkill /f /im RobloxClientTracker.exe /fi "memusage gt 2"</PreBuildEvent>
+    <PreBuildEvent>taskkill /f /im $(TargetFileName) /fi "memusage gt 2"</PreBuildEvent>
   </PropertyGroup>
 </Project>

@@ -7,6 +7,8 @@ using System.Threading.Tasks;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 
+using RobloxStudioModManager;
+
 namespace RobloxClientTracker
 {
     public class ScanFastFlags : DataMiner
