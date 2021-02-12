@@ -441,6 +441,7 @@ namespace RobloxClientTracker
             {
                 Branch = branch,
                 GenerateMetadata = true,
+                RemapExtraContent = true,
                 CanShutdownStudio = false,
                 OverrideStudioDirectory = studioDir
             };
