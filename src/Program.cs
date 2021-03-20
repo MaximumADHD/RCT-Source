@@ -540,7 +540,7 @@ namespace RobloxClientTracker
 
                     info = new ClientVersionInfo()
                     {
-                        Guid = "version-$guid",
+                        VersionGuid = "version-$guid",
                         Version = File.ReadAllText(versionFile)
                     };
                 }
@@ -553,9 +553,9 @@ namespace RobloxClientTracker
                     info.Version = FORCE_VERSION_ID;
 
                 if (!string.IsNullOrEmpty(FORCE_VERSION_GUID))
-                    info.Guid = FORCE_VERSION_GUID;
+                    info.VersionGuid = FORCE_VERSION_GUID;
 
-                if (FORCE_UPDATE || MANUAL_BUILD || info.Guid != currentVersion)
+                if (FORCE_UPDATE || MANUAL_BUILD || info.VersionGuid != currentVersion)
                 {
                     // Make sure Roblox Studio is up to date for this build.
                     print("Update detected!", YELLOW);
@@ -658,8 +658,8 @@ namespace RobloxClientTracker
                             print("\tDone!", GREEN);
                         }
 
-                        currentVersion = info.Guid;
-                        BranchRegistry.SetValue("Version", info.Guid);
+                        currentVersion = info.VersionGuid;
+                        BranchRegistry.SetValue("Version", info.VersionGuid);
                     }
                 }
                 else
@@ -676,7 +676,7 @@ namespace RobloxClientTracker
             initGitBinding(Settings.Default.FFlagRepoName);
 
             // Start tracking...
-            git("reset --hard origin/master");
+            git("reset --hard origin/main");
             git("pull");
 
             return startRoutineLoop(async () =>
