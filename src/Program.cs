@@ -765,7 +765,7 @@ namespace RobloxClientTracker
                         if (lower == "true" || lower == "false")
                             value = lower;
                         else if (!int.TryParse(value, out int testInt))
-                            value = '"' + value.Replace("\"", "\\\"") + '"';
+                            value = '"' + value.Replace("\\", "\\\\").Replace("\"", "\\\"") + '"';
 
                         result.Append($"\t\"{key}\": {value}");
                     }
