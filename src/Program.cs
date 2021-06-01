@@ -16,6 +16,7 @@ using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 
 using RobloxStudioModManager;
+using System.Collections.Concurrent;
 
 namespace RobloxClientTracker
 {
@@ -89,7 +90,8 @@ namespace RobloxClientTracker
             "XboxClient",
             "AndroidApp",
             "iOSApp",
-            "StudioApp"
+            "StudioApp",
+            "UWPApp",
         };
 
         static readonly IReadOnlyList<string> boringFiles = new List<string>()
@@ -682,6 +684,7 @@ namespace RobloxClientTracker
             return startRoutineLoop(async () =>
             {
                 var taskPool = new List<Task>();
+                var sets = new ConcurrentDictionary<string, Dictionary<string, string>>();
 
                 foreach (string platform in fflagPlatforms)
                 {
@@ -691,7 +694,7 @@ namespace RobloxClientTracker
 
                         using (WebClient http = new WebClient())
                         {
-                            http.Headers.Set("UserAgent", "RobloxStudio/WinInet");
+                            http.Headers.Set("UserAgent", "RobloxClientTracker");
                             json = await http.DownloadStringTaskAsync(fflagEndpoint + platform);
                         }
 
@@ -702,49 +705,16 @@ namespace RobloxClientTracker
                             JObject root = JObject.Load(reader);
                             JObject appSettings = root.Value<JObject>("applicationSettings");
 
-                            var keys = new List<string>();
+                            var data = new Dictionary<string, string>();
 
                             foreach (var pair in appSettings)
-                                keys.Add(pair.Key);
-
-                            var result = new StringBuilder();
-                            int testInt = 0;
-
-                            result.AppendLine("{");
-                            keys.Sort();
-
-                            for (int i = 0; i < keys.Count; i++)
                             {
-                                string key = keys[i];
-
+                                string key = pair.Key;
                                 string value = appSettings.Value<string>(key);
-                                string lower = value.ToLowerInvariant();
-
-                                if (i != 0)
-                                    result.Append(",\r\n");
-
-                                if (lower == "true" || lower == "false")
-                                    value = lower;
-                                else if (!int.TryParse(value, out testInt))
-                                    value = '"' + value.Replace("\"", "\\\"") + '"';
-
-                                result.Append($"\t\"{key}\": {value}");
+                                data.Add(key, value);
                             }
 
-                            result.Append("\r\n}");
-
-                            string filePath = Path.Combine(stageDir, platform + ".json");
-                            string newFile = result.ToString();
-                            string oldFile = "";
-
-                            if (File.Exists(filePath))
-                                oldFile = File.ReadAllText(filePath);
-
-                            if (oldFile != newFile)
-                            {
-                                print($"\tUpdating {platform}.json ...", YELLOW);
-                                File.WriteAllText(filePath, newFile);
-                            }
+                            sets.TryAdd(platform, data);
                         }
                     });
 
@@ -752,6 +722,70 @@ namespace RobloxClientTracker
                 }
 
                 await Task.WhenAll(taskPool);
+                var rootSet = sets["PCDesktopClient"];
+
+                foreach (var platform in fflagPlatforms)
+                {
+                    if (platform == "PCDesktopClient")
+                        continue;
+
+                    if (platform.EndsWith("App") || !platform.EndsWith("Bootstrapper"))
+                    {
+                        var set = sets[platform];
+
+                        foreach (string key in rootSet.Keys)
+                            set.Remove(key);
+
+                        sets[platform] = set;
+                    }
+                }
+
+                foreach (var platform in fflagPlatforms)
+                {
+                    var set = sets[platform];
+
+                    var keys = set
+                        .Select(pair => pair.Key)
+                        .OrderBy(key => key)
+                        .ToArray();
+
+                    var result = new StringBuilder();
+                    result.AppendLine("{");
+                    
+                    for (int i = 0; i < keys.Length; i++)
+                    {
+                        string key = keys[i];
+
+                        string value = set[key];
+                        string lower = value.ToLowerInvariant();
+
+                        if (i != 0)
+                            result.Append(",\r\n");
+
+                        if (lower == "true" || lower == "false")
+                            value = lower;
+                        else if (!int.TryParse(value, out int testInt))
+                            value = '"' + value.Replace("\"", "\\\"") + '"';
+
+                        result.Append($"\t\"{key}\": {value}");
+                    }
+
+                    result.Append("\r\n}");
+
+                    string filePath = Path.Combine(stageDir, platform + ".json");
+                    string newFile = result.ToString();
+                    string oldFile = "";
+
+                    if (File.Exists(filePath))
+                        oldFile = File.ReadAllText(filePath);
+
+                    if (oldFile != newFile)
+                    {
+                        print($"\tUpdating {platform}.json ...", YELLOW);
+                        File.WriteAllText(filePath, newFile);
+                    }
+                }
+                
                 string timeStamp = DateTime.Now.ToString(CultureInfo.InvariantCulture);
 
                 if (stageCommit(timeStamp))
