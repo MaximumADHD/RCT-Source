@@ -6,7 +6,7 @@ using System.Threading.Tasks;
 
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
-
+using RobloxClientTracker.Properties;
 using RobloxStudioModManager;
 
 namespace RobloxClientTracker
@@ -21,10 +21,15 @@ namespace RobloxClientTracker
         public override void ExecuteRoutine()
         {
             string localAppData = Environment.GetEnvironmentVariable("LocalAppData");
-            string clientSettings = resetDirectory(localAppData, "Roblox", "ClientSettings");
 
+            string clientSettings = resetDirectory(localAppData, "Roblox", "ClientSettings");
             string settingsPath = Path.Combine(clientSettings, "StudioAppSettings.json");
+            
+            string studioSettings = createDirectory(studioDir, "ClientSettings");
+            string studioSettingsPath = Path.Combine(studioSettings, "ClientAppSettings.json");
+           
             File.WriteAllText(settingsPath, "");
+            File.WriteAllBytes(studioSettingsPath, Resources.ClientAppSettings_json);
 
             using (var show = new SystemEvent(SHOW_EVENT))
             using (var start = new SystemEvent(START_EVENT))

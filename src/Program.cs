@@ -565,7 +565,7 @@ namespace RobloxClientTracker
                     if (!MANUAL_BUILD)
                     {
                         print("Syncing Roblox Studio...", GREEN);
-                        await studio.Bootstrap();
+                        await studio.Bootstrap(FORCE_VERSION_ID);
                     }
 
                     // Copy some metadata generated during the studio installation.

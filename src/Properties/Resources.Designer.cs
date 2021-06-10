@@ -83,6 +83,16 @@ namespace RobloxClientTracker.Properties {
         /// <summary>
         ///   Looks up a localized resource of type System.Byte[].
         /// </summary>
+        internal static byte[] ClientAppSettings_json {
+            get {
+                object obj = ResourceManager.GetObject("ClientAppSettings_json", resourceCulture);
+                return ((byte[])(obj));
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized resource of type System.Byte[].
+        /// </summary>
         internal static byte[] Deflate_lua {
             get {
                 object obj = ResourceManager.GetObject("Deflate_lua", resourceCulture);
