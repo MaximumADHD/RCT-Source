@@ -13,7 +13,8 @@ namespace RobloxClientTracker
             "configs",
             "scripts",
             "LuaPackages",
-            "translations"
+            "translations",
+            "textures"
         };
 
         public CopyContentFolders()

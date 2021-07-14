@@ -72,7 +72,7 @@ namespace RobloxClientTracker
                 Console.Write('\t');
 
             print($"Writing file: {localPath(path)}", config.Color);
-            writeFile(path, contents);
+            writeFile(@"\\?\" + path, contents);
         }
     }
 }

@@ -169,7 +169,7 @@ namespace RobloxClientTracker
 
         public static string createDirectory(params string[] traversal)
         {
-            string dir = Path.Combine(traversal);
+            string dir = @"\\?\" + Path.Combine(traversal);
 
             if (!Directory.Exists(dir))
                 Directory.CreateDirectory(dir);
