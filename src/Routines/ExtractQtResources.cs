@@ -20,7 +20,17 @@ namespace RobloxClientTracker
             { "Deflate.lua",       Resources.Deflate_lua      },
             { "Bit.lua",           Resources.Bit_lua          },
         };
-        
+
+        private static string shortenPath(params string[] traversal)
+        {
+            string path = Path.Combine(traversal);
+
+            if (path.StartsWith(@"\\?\"))
+                path = path.Substring(4);
+
+            return path;
+        }
+
         private void deployLuaJit(string dir)
         {
             resetDirectory(dir);
@@ -54,7 +64,7 @@ namespace RobloxClientTracker
         public override void ExecuteRoutine()
         {
             string extractDir = resetDirectory(stageDir, "QtResources");
-            string luaDir = Path.Combine(trunk, "lua");
+            string luaDir = shortenPath(trunk, "lua");
 
             string luaJit = Path.Combine(luaDir, "luajit.cmd");
             string qtExtract = Path.Combine(luaDir, "QtExtract.lua");
@@ -65,10 +75,13 @@ namespace RobloxClientTracker
                 deployLuaJit(luaDir);
             }
 
+            string rawStudioPath = shortenPath(studioPath);
+            extractDir = shortenPath(extractDir);
+            
             var extract = new ProcessStartInfo()
             {
                 FileName = luaJit,
-                Arguments = $"{qtExtract} {studioPath} --chunk 1 --output {extractDir}",
+                Arguments = $"{qtExtract} {rawStudioPath} --chunk 1 --output {extractDir}",
 
                 CreateNoWindow = true,
                 UseShellExecute = false
