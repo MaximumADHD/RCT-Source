@@ -65,10 +65,10 @@ namespace RobloxClientTracker
             base.ExecuteRoutine();
         }
 
-        private static List<string> hackOutPattern(string source, string pattern)
+        private static IEnumerable<string> hackOutPattern(string source, string pattern, bool repeats = false)
         {
-            MatchCollection matches = Regex.Matches(source, pattern);
-            var lines = new List<string>();
+            var matches = Regex.Matches(source, pattern);
+            var lines = new HashSet<string>();
 
             foreach (Match match in matches)
             {
@@ -89,8 +89,7 @@ namespace RobloxClientTracker
                 lines.Add(matchStr);
             }
 
-            lines.Sort();
-            return lines;
+            return lines.OrderBy(line => line);
         }
 
         private void extractDeepStrings()
@@ -123,8 +122,8 @@ namespace RobloxClientTracker
 
                 if (data.ToUpperInvariant().EndsWith("@@", Program.InvariantString))
                 {
-                    StringBuilder output = new StringBuilder(8192);
-                    int hResult = UnDecorateSymbolName(data, output, 8192, UnDecorateFlags.UNDNAME_NO_ARGUMENTS | UnDecorateFlags.UNDNAME_NO_LEADING_UNDERSCORES);
+                    var output = new StringBuilder(8192);
+                    UnDecorateSymbolName(data, output, 8192, UnDecorateFlags.UNDNAME_NO_ARGUMENTS);
 
                     string result = output.ToString();
 

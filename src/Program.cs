@@ -564,6 +564,7 @@ namespace RobloxClientTracker
                 {
                     // Make sure Roblox Studio is up to date for this build.
                     print("Update detected!", YELLOW);
+                    git("pull");
                     
                     if (!MANUAL_BUILD)
                     {

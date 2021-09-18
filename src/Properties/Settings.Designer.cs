@@ -25,7 +25,7 @@ namespace RobloxClientTracker.Properties {
         
         [global::System.Configuration.ApplicationScopedSettingAttribute()]
         [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
-        [global::System.Configuration.DefaultSettingValueAttribute("CloneTrooper1019")]
+        [global::System.Configuration.DefaultSettingValueAttribute("MaximumADHD")]
         public string RepoOwner {
             get {
                 return ((string)(this["RepoOwner"]));

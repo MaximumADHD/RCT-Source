@@ -2,6 +2,8 @@
 using System.IO;
 
 using Roblox.Reflection;
+using Newtonsoft.Json;
+using System.Diagnostics;
 
 namespace RobloxClientTracker
 {
@@ -23,6 +25,13 @@ namespace RobloxClientTracker
             string exportPath = Path.Combine(stageDir, "API-Dump.txt");
 
             writeFile(exportPath, dump);
+            print("Minifying API Dump...");
+
+            var source = api.Source;
+            var minified = source.ToString(Formatting.None);
+
+            string minJsonFile = Path.Combine(stageDir, "Mini-API-Dump.json");
+            writeFile(minJsonFile, minified);
         }
     }
 }
