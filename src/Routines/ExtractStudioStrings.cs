@@ -65,7 +65,7 @@ namespace RobloxClientTracker
             base.ExecuteRoutine();
         }
 
-        private static IEnumerable<string> hackOutPattern(string source, string pattern, bool repeats = false)
+        private static IEnumerable<string> hackOutPattern(string source, string pattern)
         {
             var matches = Regex.Matches(source, pattern);
             var lines = new HashSet<string>();

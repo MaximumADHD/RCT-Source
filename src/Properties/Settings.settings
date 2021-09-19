@@ -3,7 +3,7 @@
   <Profiles />
   <Settings>
     <Setting Name="RepoOwner" Type="System.String" Scope="Application">
-      <Value Profile="(Default)">CloneTrooper1019</Value>
+      <Value Profile="(Default)">MaximumADHD</Value>
     </Setting>
     <Setting Name="ClientRepoName" Type="System.String" Scope="Application">
       <Value Profile="(Default)">Roblox-Client-Tracker</Value>

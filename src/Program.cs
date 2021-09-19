@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Collections.Concurrent;
 using System.Diagnostics;
 using System.Globalization;
 using System.IO;
@@ -15,8 +16,8 @@ using RobloxClientTracker.Properties;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 
+using RobloxDeployHistory;
 using RobloxStudioModManager;
-using System.Collections.Concurrent;
 
 namespace RobloxClientTracker
 {
@@ -543,11 +544,10 @@ namespace RobloxClientTracker
                     if (!File.Exists(versionFile))
                         throw new Exception($"MISSING FILE {versionFile}");
 
-                    info = new ClientVersionInfo()
-                    {
-                        VersionGuid = "version-$guid",
-                        Version = File.ReadAllText(versionFile)
-                    };
+                    const string versionGuid = "version-$guid";
+                    string version = File.ReadAllText(versionFile);
+
+                    info = new ClientVersionInfo(version, versionGuid);
                 }
                 else
                 {
@@ -555,10 +555,10 @@ namespace RobloxClientTracker
                 }
 
                 if (!string.IsNullOrEmpty(FORCE_VERSION_ID))
-                    info.Version = FORCE_VERSION_ID;
+                    info = new ClientVersionInfo(FORCE_VERSION_ID, info.VersionGuid);
 
                 if (!string.IsNullOrEmpty(FORCE_VERSION_GUID))
-                    info.VersionGuid = FORCE_VERSION_GUID;
+                    info = new ClientVersionInfo(info.Version, FORCE_VERSION_GUID);
 
                 if (FORCE_UPDATE || MANUAL_BUILD || info.VersionGuid != currentVersion)
                 {
