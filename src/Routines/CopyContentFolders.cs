@@ -12,6 +12,7 @@ namespace RobloxClientTracker
             "avatar",
             "configs",
             "scripts",
+            "api-docs",
             "LuaPackages",
             "translations",
             "textures"

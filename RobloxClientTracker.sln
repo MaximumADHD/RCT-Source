@@ -13,6 +13,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "RobloxApiDumpTool", "..\Rob
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "RobloxFileFormat", "..\Roblox-File-Format\RobloxFileFormat.csproj", "{CF50C0E2-23A7-4DC1-B4B2-E60CDE716253}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "RobloxDeployHistory", "..\Roblox-Deploy-History\RobloxDeployHistory.csproj", "{1CE1A9DF-C2FF-49C4-9B7C-792C962C339F}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -71,6 +73,18 @@ Global
 		{CF50C0E2-23A7-4DC1-B4B2-E60CDE716253}.Release|Any CPU.Build.0 = Release|Any CPU
 		{CF50C0E2-23A7-4DC1-B4B2-E60CDE716253}.Release|x64.ActiveCfg = Release|Any CPU
 		{CF50C0E2-23A7-4DC1-B4B2-E60CDE716253}.Release|x64.Build.0 = Release|Any CPU
+		{1CE1A9DF-C2FF-49C4-9B7C-792C962C339F}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{1CE1A9DF-C2FF-49C4-9B7C-792C962C339F}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{1CE1A9DF-C2FF-49C4-9B7C-792C962C339F}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{1CE1A9DF-C2FF-49C4-9B7C-792C962C339F}.Debug|x64.Build.0 = Debug|Any CPU
+		{1CE1A9DF-C2FF-49C4-9B7C-792C962C339F}.Internal|Any CPU.ActiveCfg = Debug|Any CPU
+		{1CE1A9DF-C2FF-49C4-9B7C-792C962C339F}.Internal|Any CPU.Build.0 = Debug|Any CPU
+		{1CE1A9DF-C2FF-49C4-9B7C-792C962C339F}.Internal|x64.ActiveCfg = Debug|Any CPU
+		{1CE1A9DF-C2FF-49C4-9B7C-792C962C339F}.Internal|x64.Build.0 = Debug|Any CPU
+		{1CE1A9DF-C2FF-49C4-9B7C-792C962C339F}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{1CE1A9DF-C2FF-49C4-9B7C-792C962C339F}.Release|Any CPU.Build.0 = Release|Any CPU
+		{1CE1A9DF-C2FF-49C4-9B7C-792C962C339F}.Release|x64.ActiveCfg = Release|Any CPU
+		{1CE1A9DF-C2FF-49C4-9B7C-792C962C339F}.Release|x64.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
@@ -79,6 +93,7 @@ Global
 		{FAD2621F-B280-4D6D-A260-F410C5B06E0C} = {B83D911D-EAD1-44D7-B289-D11D23883E76}
 		{585EAB66-7C64-482D-8619-2D2EB972CFC9} = {B83D911D-EAD1-44D7-B289-D11D23883E76}
 		{CF50C0E2-23A7-4DC1-B4B2-E60CDE716253} = {B83D911D-EAD1-44D7-B289-D11D23883E76}
+		{1CE1A9DF-C2FF-49C4-9B7C-792C962C339F} = {B83D911D-EAD1-44D7-B289-D11D23883E76}
 	EndGlobalSection
 	GlobalSection(ExtensibilityGlobals) = postSolution
 		SolutionGuid = {D2E83754-AF4E-4BCF-B29F-BCA851143365}
