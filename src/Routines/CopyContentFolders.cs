@@ -1,6 +1,9 @@
 ﻿using System;
 using System.IO;
 
+using Newtonsoft.Json;
+using Newtonsoft.Json.Linq;
+
 namespace RobloxClientTracker
 {
     public class CopyContentFolders : RobloxFileMiner
@@ -51,9 +54,31 @@ namespace RobloxClientTracker
                     string source = File.ReadAllText(file);
                     string newSource = sanitizeString(source);
 
-                    if (source != newSource)
+                    if (source == newSource)
+                        continue;
+
+                    writeFile(file, newSource);
+                }
+                else if (file.EndsWith(".json", Program.InvariantString))
+                {
+                    string rawJson = File.ReadAllText(file);
+
+                    using (var reader = new StringReader(rawJson))
+                    using (var jsonReader = new JsonTextReader(reader))
                     {
-                        writeFile(file, newSource);
+                        var json = JObject.Load(jsonReader);
+
+                        string minified = json.ToString(Formatting.None);
+                        string indented = json.ToString(Formatting.Indented);
+
+                        var info = new FileInfo(file);
+                        string dir = info.DirectoryName;
+
+                        string minDir = createDirectory(dir, "mini");
+                        string minFile = Path.Combine(minDir, info.Name);
+
+                        writeFile(file, indented);
+                        writeFile(minFile, minified);
                     }
                 }
             }
