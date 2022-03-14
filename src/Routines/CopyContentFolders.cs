@@ -15,7 +15,7 @@ namespace RobloxClientTracker
             "avatar",
             "configs",
             "scripts",
-            "api-docs",
+            "api_docs",
             "LuaPackages",
             "translations",
             "textures"
@@ -33,7 +33,7 @@ namespace RobloxClientTracker
         private void copyContentFolder(string folderName)
         {
             string srcFolder = Path.Combine(studioDir, "content", folderName);
-            string destFolder = resetDirectory(stageDir, folderName);
+            string destFolder = resetDirectory(stageDir, folderName.Replace('_', '-'));
 
             print($"Copying {srcFolder} to {destFolder}");
             copyDirectory(srcFolder, destFolder);

@@ -31,8 +31,7 @@ namespace RobloxClientTracker
 
         public static RegistryKey RootRegistry;
         public static RegistryKey BranchRegistry;
-
-        public static Encoding UTF8 = new UTF8Encoding(false);
+        public static readonly Encoding UTF8 = new UTF8Encoding(false);
 
         const string ARG_BRANCH = "-branch";
         const string ARG_PARENT = "-parent";
@@ -149,6 +148,7 @@ namespace RobloxClientTracker
         public static string stageDir { get; private set; }
         public static string studioDir { get; private set; }
         public static string studioPath { get; private set; }
+        public static BootstrapperState state { get; private set; }
         public static StudioBootstrapper studio { get; private set; }
 
         static readonly Dictionary<string, string> argMap = new Dictionary<string, string>();
@@ -442,8 +442,9 @@ namespace RobloxClientTracker
 
             // Setup studio bootstrapper.
             studioDir = createDirectory(trunk, "builds", branch);
+            state = BootstrapperState.Load(studioDir);
 
-            studio = new StudioBootstrapper(BranchRegistry)
+            studio = new StudioBootstrapper(state)
             {
                 Branch = branch,
                 GenerateMetadata = true,
@@ -551,7 +552,7 @@ namespace RobloxClientTracker
                 }
                 else
                 {
-                    info = await StudioBootstrapper.GetCurrentVersionInfo(branch);
+                    info = await StudioBootstrapper.GetCurrentVersionInfo(branch, state.VersionData);
                 }
 
                 if (!string.IsNullOrEmpty(FORCE_VERSION_ID))
@@ -672,6 +673,8 @@ namespace RobloxClientTracker
                 {
                     print("No updates right now!", GREEN);
                 }
+
+                state.Save(studioDir);
             });
         }
 
