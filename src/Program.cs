@@ -10,7 +10,6 @@ using System.Text;
 using System.Threading.Tasks;
 using System.Text.RegularExpressions;
 
-using Microsoft.Win32;
 using RobloxClientTracker.Properties;
 
 using Newtonsoft.Json;
@@ -18,6 +17,8 @@ using Newtonsoft.Json.Linq;
 
 using RobloxDeployHistory;
 using RobloxStudioModManager;
+
+#pragma warning disable IDE1006 // Naming Styles
 
 namespace RobloxClientTracker
 {
@@ -29,8 +30,6 @@ namespace RobloxClientTracker
             FastFlags
         }
 
-        public static RegistryKey RootRegistry;
-        public static RegistryKey BranchRegistry;
         public static readonly Encoding UTF8 = new UTF8Encoding(false);
 
         const string ARG_BRANCH = "-branch";
@@ -47,6 +46,7 @@ namespace RobloxClientTracker
 
         const string ARG_FORCE_VERSION_ID = "-forceVersionId";
         const string ARG_FORCE_VERSION_GUID = "-forceVersionGuid";
+        const string ARG_FORCE_PACKAGE_ANALYSIS = "-forcePackageAnalysis";
 
         public const ConsoleColor DARK_YELLOW = ConsoleColor.DarkYellow;
         public const ConsoleColor DARK_GREEN = ConsoleColor.DarkGreen;
@@ -72,6 +72,7 @@ namespace RobloxClientTracker
         static TrackMode TRACK_MODE = TrackMode.Client;
         static readonly Type DataMiner = typeof(DataMiner);
 
+        public static bool FORCE_PACKAGE_ANALYSIS = false;
         public static string FORCE_VERSION_GUID = "";
         public static string FORCE_VERSION_ID = "";
 
@@ -90,7 +91,8 @@ namespace RobloxClientTracker
             "XboxClient",
             "AndroidApp",
             "iOSApp",
-            "StudioApp",
+            "PCStudioApp",
+            "MacStudioApp",
             "UWPApp",
         };
 
@@ -141,14 +143,14 @@ namespace RobloxClientTracker
             RedirectStandardOutput = true,
         };
 
-        static string branch = "roblox";
-        static string parent = "roblox";
+        public static string branch = "roblox";
+        public static string parent = "roblox";
 
         public static string trunk { get; private set; }
         public static string stageDir { get; private set; }
         public static string studioDir { get; private set; }
         public static string studioPath { get; private set; }
-        public static BootstrapperState state { get; private set; }
+        public static ClientTrackerState state { get; private set; }
         public static StudioBootstrapper studio { get; private set; }
 
         static readonly Dictionary<string, string> argMap = new Dictionary<string, string>();
@@ -334,40 +336,45 @@ namespace RobloxClientTracker
             }
         }
 
-        static bool initGitBinding(string repository)
+        public static void cloneRepo(string repository)
         {
+            var settings = Settings.Default;
+            string owner = settings.RepoOwner;
+
+            string userProfile = Environment.GetEnvironmentVariable("UserProfile");
+            string privateKey = Path.Combine(userProfile, ".ssh", "RobloxClientTracker")
+                .Replace('\\', '/');
+
+            if (!File.Exists(privateKey))
+            {
+                print("FATAL: Missing SSH private key 'RobloxClientTracker' in ~\\.ssh!", RED);
+                print("Please generate such a key above and make sure its connected to GitHub!\n", RED);
+
+                print("For more information, visit:");
+                print("https://help.github.com/en/github/authenticating-to-github/generating-a-new-ssh-key-and-adding-it-to-the-ssh-agent\n", CYAN);
+
+                print("Press any key to continue...");
+                Console.Read();
+
+                Environment.Exit(1);
+            }
+
+            string sshCommand = $"ssh -i {privateKey}";
+            string repoUrl = $"git@github.com:{owner}/{repository}.git";
+
+            git($"clone -c core.sshCommand=\"{sshCommand}\" {repoUrl} {stageDir}");
+        }
+
+        public static bool initGitBinding(string repository)
+        {
+            var settings = Settings.Default;
             string gitBinding = Path.Combine(stageDir, ".git");
 
             if (!Directory.Exists(gitBinding))
             {
                 print($"Assembling stage for {branch}...", MAGENTA);
-
-                var settings = Settings.Default;
-                string owner = settings.RepoOwner;
-
-                string userProfile = Environment.GetEnvironmentVariable("UserProfile");
-                string privateKey = Path.Combine(userProfile, ".ssh", "RobloxClientTracker")
-                    .Replace('\\', '/');
-
-                if (!File.Exists(privateKey))
-                {
-                    print("FATAL: Missing SSH private key 'RobloxClientTracker' in ~\\.ssh!", RED);
-                    print("Please generate such a key above and make sure its connected to GitHub!\n", RED);
-
-                    print("For more information, visit:");
-                    print("https://help.github.com/en/github/authenticating-to-github/generating-a-new-ssh-key-and-adding-it-to-the-ssh-agent\n", CYAN);
-
-                    print("Press any key to continue...");
-                    Console.Read();
-
-                    Environment.Exit(1);
-                }
-
-                string sshCommand = $"ssh -i {privateKey}";
-                string repoUrl = $"git@github.com:{owner}/{repository}.git";
-
-                git($"clone -c core.sshCommand=\"{sshCommand}\" {repoUrl} {stageDir}");
-
+                cloneRepo(repository);
+                
                 string name = settings.BotName;
                 git("config", "--local", "user.name", $"\"{name}\"");
 
@@ -442,7 +449,7 @@ namespace RobloxClientTracker
 
             // Setup studio bootstrapper.
             studioDir = createDirectory(trunk, "builds", branch);
-            state = BootstrapperState.Load(studioDir);
+            state = ClientTrackerState.Load(studioDir);
 
             studio = new StudioBootstrapper(state)
             {
@@ -457,7 +464,6 @@ namespace RobloxClientTracker
             studio.EchoFeed += new MessageEventHandler((sender, e) => print(e.Message, YELLOW));
             studio.StatusChanged += new MessageEventHandler((sender, e) => print(e.Message, MAGENTA));
 
-            // Setup data miner tasks.
             var dataMiners = AppDomain.CurrentDomain
                 .GetAssemblies()
                 .SelectMany(assembly => assembly.GetTypes())
@@ -467,8 +473,6 @@ namespace RobloxClientTracker
                 .Cast<DataMiner>();
 
             // Report set arguments.
-            string currentVersion = BranchRegistry.GetString("Version");
-            
             if (FORCE_REBASE)
                 print("\tCaution: FORCE_REBASE is set to true!", YELLOW);
 
@@ -528,7 +532,7 @@ namespace RobloxClientTracker
                         }
 
                         git("push", "--force");
-                        currentVersion = "";
+                        state.Version = "";
                     }
                 }
 
@@ -561,7 +565,7 @@ namespace RobloxClientTracker
                 if (!string.IsNullOrEmpty(FORCE_VERSION_GUID))
                     info = new ClientVersionInfo(info.Version, FORCE_VERSION_GUID);
 
-                if (FORCE_UPDATE || MANUAL_BUILD || info.VersionGuid != currentVersion)
+                if (FORCE_UPDATE || MANUAL_BUILD || info.VersionGuid != state.Version)
                 {
                     // Make sure Roblox Studio is up to date for this build.
                     print("Update detected!", YELLOW);
@@ -665,8 +669,7 @@ namespace RobloxClientTracker
                             print("\tDone!", GREEN);
                         }
 
-                        currentVersion = info.VersionGuid;
-                        BranchRegistry.SetValue("Version", info.VersionGuid);
+                        state.Version = info.VersionGuid;
                     }
                 }
                 else
@@ -699,10 +702,18 @@ namespace RobloxClientTracker
                     {
                         string json = "";
 
-                        using (WebClient http = new WebClient())
+                        try
                         {
-                            http.Headers.Set("UserAgent", "RobloxClientTracker");
-                            json = await http.DownloadStringTaskAsync(fflagEndpoint + platform);
+                            using (WebClient http = new WebClient())
+                            {
+                                http.Headers.Set("UserAgent", "RobloxClientTracker");
+                                json = await http.DownloadStringTaskAsync(fflagEndpoint + platform);
+                            }
+                        }
+                        catch (Exception e)
+                        {
+                            print($"\tError fetching FFlag platform: {platform}!", RED);
+                            return;
                         }
 
                         using (var jsonText = new StringReader(json))
@@ -738,7 +749,8 @@ namespace RobloxClientTracker
 
                     if (platform.EndsWith("App") || !platform.EndsWith("Bootstrapper"))
                     {
-                        var set = sets[platform];
+                        if (!sets.TryGetValue(platform, out var set))
+                            continue;
 
                         foreach (string key in rootSet.Keys)
                             set.Remove(key);
@@ -749,7 +761,8 @@ namespace RobloxClientTracker
 
                 foreach (var platform in fflagPlatforms)
                 {
-                    var set = sets[platform];
+                    if (!sets.TryGetValue(platform, out var set))
+                        continue;
 
                     var keys = set
                         .Select(pair => pair.Key)
@@ -860,6 +873,9 @@ namespace RobloxClientTracker
             if (argMap.ContainsKey(ARG_FORCE_VERSION_GUID))
                 FORCE_VERSION_GUID = argMap[ARG_FORCE_VERSION_GUID];
 
+            if (argMap.ContainsKey(ARG_FORCE_PACKAGE_ANALYSIS))
+                FORCE_PACKAGE_ANALYSIS = true;
+
             if (argMap.ContainsKey(ARG_TRACK_MODE))
                 if (!Enum.TryParse(argMap[ARG_TRACK_MODE], out TRACK_MODE))
                     print($"Bad {ARG_TRACK_MODE} provided.", RED);
@@ -872,9 +888,6 @@ namespace RobloxClientTracker
                 branch = "fflags";
             }
             #endregion
-
-            RootRegistry = Registry.CurrentUser.Open("Software", "RobloxClientTracker");
-            BranchRegistry = RootRegistry.Open(branch);
 
             trunk = createDirectory(@"C:\Roblox-Client-Tracker");
             stageDir = createDirectory(trunk, "stage", branch);

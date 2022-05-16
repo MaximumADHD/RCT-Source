@@ -1,10 +1,12 @@
 ﻿using System;
 using System.IO;
 using System.Linq;
+using System.Collections.Generic;
 using System.Diagnostics.Contracts;
 
 using RobloxFiles;
-using Microsoft.Win32;
+using System.Diagnostics;
+#pragma warning disable IDE1006 // Naming Styles
 
 namespace RobloxClientTracker
 {
@@ -15,12 +17,25 @@ namespace RobloxClientTracker
     /// </summary>
     public abstract class RobloxFileMiner : MultiTaskMiner
     {
-        private static RegistryKey modelManifest => Program.BranchRegistry?.Open("ModelManifest");
+        private static Dictionary<string, string> modelManifest => state.ModelManifest;
+        private static Dictionary<string, Dictionary<Instance, Instance>> packages = new Dictionary<string, Dictionary<Instance, Instance>>();
 
         private static readonly FileLogConfig LogRbxm = new FileLogConfig()
         {
             Color = Program.DARK_CYAN,
             Stack = 3
+        };
+
+        // absolute last resort for stupid inconsistent package locations lol.
+
+        private static readonly List<string> KnownPackages = new List<string>()
+        {
+            "Cryo",
+            "Roact",
+            "Rodux",
+            "TestEZ",
+            "UILibrary",
+            "RoactRodux",
         };
 
         protected static void copyDirectory(string source, string target)
@@ -71,7 +86,11 @@ namespace RobloxClientTracker
             }
             else if (inst is StringValue str && inst.Name != "AvatarPartScaleType")
             {
-                extension = ".txt";
+                if (inst.Name.StartsWith("."))
+                    extension = "";
+                else
+                    extension = ".txt";
+
                 value = str.Value;
             }
             else if (inst is LocalizationTable table)
@@ -85,33 +104,146 @@ namespace RobloxClientTracker
             return (value.Length > 0);
         }
 
-        private void unpackImpl(Instance inst, string parentDir)
+        private void recordPackage(Instance inst)
         {
-            string name = inst.Name;
+            var parent = inst.Parent;
+            inst.Parent = null;
 
-            string extension = "";
-            string value = "";
+            if (inst.Name.StartsWith("_"))
+                return;
 
-            if (PullInstanceData(inst, ref value, ref extension))
+            if (!packages.TryGetValue(inst.Name, out var list))
             {
-                string filePath = Path.Combine(parentDir, name + extension);
-                writeFile(filePath, value, LogRbxm);
+                list = new Dictionary<Instance, Instance>();
+                packages.Add(inst.Name, list);
             }
+
+            list.Add(inst, parent);
+        }
+
+        private void unpackImpl(Instance inst, string parentDir, Instance expectParent)
+        {
+            if (inst.Parent != expectParent)
+                return;
+
+            string name = inst.Name;
+            var packageBin = inst.Parent;
 
             var children = inst
                 .GetChildren()
                 .ToList();
 
-            if (children.Count > 0)
+            if (name == ".robloxrc")
             {
-                string instDir = createDirectory(parentDir, name);
-                children.ForEach(child => unpackImpl(child, instDir));
+                // Definitely rotriever package.
+                recordPackage(packageBin);
+                return;
+            }
+            else if (KnownPackages.Contains(name) && children.Count > 0)
+            {
+                recordPackage(inst);
+                return;
+            }
+            else if (name.StartsWith("_"))
+            {
+                // Probably a package managed by Rotriever.
+                if (packageBin != null)
+                {
+                    var set = packageBin.GetChildren();
+
+                    foreach (var child in set)
+                    {
+                        // Ignore _Index
+                        if (child == inst)
+                            continue;
+
+                        // Ignore test bindings
+                        if (child.Name == "Dev")
+                            continue;
+
+                        // Ignore package links.
+                        if (!child.GetChildren().Any())
+                            continue;
+
+                        // This isn't a rotriever package, but it's probably reused.
+                        children.Remove(child);
+                        recordPackage(child);
+                    }
+                }
+
+                foreach (var child in children)
+                {
+                    var packageName = child.Name
+                        .Split('_')
+                        .Last();
+                    
+                    LuaSourceContainer package = null;
+                    var target = child;
+
+                    if (name == "_IndexLegacy" || name == "_Legacy")
+                        target = child.FindFirstChild("Packages");
+
+                    if (target == null)
+                        continue;
+                    
+                    foreach (var module in target.GetChildren())
+                    {
+                        if (!packageName.StartsWith(module.Name))
+                            continue;
+
+                        if (module is LuaSourceContainer luaModule)
+                        {
+                            package = luaModule;
+                            break;
+                        }
+                    }
+
+                    if (package == null)
+                        continue;
+
+                    recordPackage(child);
+                }
+
+                children.Clear();
+            }
+
+            string instDir = resetDirectory(parentDir, name);
+            var indexHack = inst.FindFirstChild("_Index");
+
+            string extension = "";
+            string value = "";
+
+            if (indexHack != null)
+            {
+                children.Remove(indexHack);
+                children.Insert(0, indexHack);
+            }
+
+            if (inst.Parent != packageBin)
+                return;
+            else if (children.Count > 0)
+                children.ForEach(child => unpackImpl(child, instDir, inst));
+            else if (Directory.Exists(instDir))
+                Directory.Delete(instDir);
+
+            if (PullInstanceData(inst, ref value, ref extension))
+            {
+                if (inst is LuaSourceContainer lua && Directory.Exists(instDir))
+                {
+                    string filePath = Path.Combine(instDir, "init" + extension);
+                    writeFile(filePath, value, LogRbxm);
+                }
+                else
+                {
+                    string filePath = instDir + extension;
+                    writeFile(filePath, value, LogRbxm);
+                }
             }
         }
 
         protected void unpackFile(string filePath, bool checkHash, bool delete = true)
         {
-            FileInfo info = new FileInfo(filePath);
+            var info = new FileInfo(filePath);
 
             if (info.Exists && (info.Extension == ".rbxm" || info.Extension == ".rbxmx"))
             {
@@ -124,20 +256,20 @@ namespace RobloxClientTracker
                     File.Delete(filePath);
 
                 string newHash = "";
-                
+                modelManifest.TryGetValue(regKey, out string currentHash);
+
                 if (checkHash)
                 {
-                    string currentHash = modelManifest.GetString(regKey);
                     newHash = ModelHasher.GetFileHash(file);
 
-                    if (currentHash == newHash)
+                    if (currentHash == newHash && !Program.FORCE_PACKAGE_ANALYSIS)
                     {
                         print($"\t\t\tNo changes to {regKey}. Skipping!", ConsoleColor.Red);
                         return;
                     }
                 }
 
-                Instance[] children = file.GetChildren();
+                var children = file.GetChildren();
 
                 if (children.Length == 1)
                 {
@@ -145,12 +277,12 @@ namespace RobloxClientTracker
                     project.Name = projectName;
                     project.Parent = null;
 
-                    unpackImpl(project, info.DirectoryName);
+                    unpackImpl(project, info.DirectoryName, null);
 
                     if (newHash.Length == 0)
                         return;
 
-                    modelManifest.SetValue(regKey, newHash);
+                    modelManifest[regKey] = newHash;
                 }
             }
         }

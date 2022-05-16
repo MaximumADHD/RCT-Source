@@ -67,5 +67,17 @@ namespace RobloxClientTracker.Properties {
                 return ((string)(this["BotEmail"]));
             }
         }
+        
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("maximumadhd.github.io")]
+        public string ApiSite {
+            get {
+                return ((string)(this["ApiSite"]));
+            }
+            set {
+                this["ApiSite"] = value;
+            }
+        }
     }
 }

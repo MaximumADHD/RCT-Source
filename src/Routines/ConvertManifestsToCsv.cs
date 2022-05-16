@@ -2,6 +2,8 @@
 using System.IO;
 using System.Linq;
 
+#pragma warning disable IDE1006 // Naming Styles
+
 namespace RobloxClientTracker
 {
     public class ConvertManifestsToCsv : MultiTaskMiner

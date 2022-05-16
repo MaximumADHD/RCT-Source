@@ -5,6 +5,7 @@ using System.IO;
 using System.IO.Compression;
 
 using RobloxClientTracker.Properties;
+#pragma warning disable IDE1006 // Naming Styles
 
 namespace RobloxClientTracker
 {

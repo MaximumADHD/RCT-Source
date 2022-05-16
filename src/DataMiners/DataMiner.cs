@@ -1,7 +1,9 @@
 ﻿using System;
+using System.Collections.Generic;
 using System.IO;
 
 using RobloxStudioModManager;
+#pragma warning disable IDE1006 // Naming Styles
 
 namespace RobloxClientTracker
 {
@@ -18,23 +20,19 @@ namespace RobloxClientTracker
 
         // Protected utility fields for the derived classes to use.
         protected static StudioBootstrapper studio => Program.studio;
+        protected static ClientTrackerState state => Program.state;
 
         protected static string studioDir => studio.GetLocalStudioDirectory();
         protected static string studioPath => Program.studioPath;
         
         protected static string stageDir => Program.stageDir;
+        protected static string branch => Program.branch;
         protected static string trunk => Program.trunk;
-        
-        protected void print(string message, ConsoleColor? color = null)
-        {
-            Program.print(message, color ?? LogColor);
-        }
-        
-        protected static string createDirectory(params string[] traversal)
-        {
-            return Program.createDirectory(traversal);
-        }
 
+        protected IEnumerable<string> git(params string[] args) => Program.git(args);
+        protected void print(string message, ConsoleColor? color = null) => Program.print(message, color ?? LogColor);
+        protected static string createDirectory(params string[] traversal) => Program.createDirectory(traversal);
+        
         protected static string resetDirectory(params string[] traversal)
         {
             string dir = Path.Combine(traversal);

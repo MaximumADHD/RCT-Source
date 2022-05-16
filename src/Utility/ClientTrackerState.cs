@@ -7,8 +7,9 @@ using Newtonsoft.Json;
 
 namespace RobloxClientTracker
 {
-    public class BootstrapperState : IBootstrapperState
+    public class ClientTrackerState : IBootstrapperState
     {
+        public string Version { get; set; } = "";
         public bool DeprecateMD5 { get; set; } = true;
         public string BuildBranch { get; set; } = "roblox";
 
@@ -16,20 +17,23 @@ namespace RobloxClientTracker
         public Dictionary<string, string> FileManifest { get; set; } = new Dictionary<string, string>();
         public Dictionary<string, PackageState> PackageManifest { get; set; } = new Dictionary<string, PackageState>();
 
-        public static BootstrapperState Load(string studioDir)
+        public Dictionary<string, string> ModelManifest { get; set; } = new Dictionary<string, string>();
+        public Dictionary<string, Dictionary<string, string>> ShaderManifest = new Dictionary<string, Dictionary<string, string>>();
+
+        public static ClientTrackerState Load(string studioDir)
         {
             string path = Path.Combine(studioDir, "state.json");
-            BootstrapperState state;
+            ClientTrackerState state;
 
             try
             {
                 string content = File.ReadAllText(path);
-                state = JsonConvert.DeserializeObject<BootstrapperState>(content);
+                state = JsonConvert.DeserializeObject<ClientTrackerState>(content);
             }
             catch
             {
                 Program.log("Couldn't find/load bootstrapper state, creating new one.", ConsoleColor.Red);
-                state = new BootstrapperState();
+                state = new ClientTrackerState();
             }
 
             return state;

@@ -7,6 +7,7 @@ using System.Security.Cryptography;
 using System.Text;
 
 using RobloxFiles;
+#pragma warning disable IDE1006 // Naming Styles
 
 namespace RobloxClientTracker
 {

@@ -4,6 +4,8 @@ using System.IO;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 
+#pragma warning disable IDE1006 // Naming Styles
+
 namespace RobloxClientTracker
 {
     public class CopyContentFolders : RobloxFileMiner

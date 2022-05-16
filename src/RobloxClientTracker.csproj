@@ -91,7 +91,7 @@
     <Compile Include="Csv\CsvBuilder.cs" />
     <Compile Include="Csv\CsvLocalizationEntry.cs" />
     <Compile Include="Csv\CsvLocalizationTable.cs" />
-    <Compile Include="Utility\BootstrapperState.cs" />
+    <Compile Include="Utility\ClientTrackerState.cs" />
     <Compile Include="Utility\Extensions.cs" />
     <Compile Include="Utility\FileLogConfig.cs" />
     <Compile Include="Utility\ModelHasher.cs" />

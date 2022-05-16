@@ -75,7 +75,7 @@ namespace RobloxClientTracker
             return string.Compare(Id, obj?.ToString(), Program.InvariantString);
         }
 
-        public void WriteFile(UnpackShaders unpacker, string dir, RegistryKey container)
+        public void WriteFile(UnpackShaders unpacker, string dir, Dictionary<string, string> container)
         {
             Contract.Requires(unpacker != null);
             string contents = Program.UTF8.GetString(Buffer);
@@ -130,11 +130,11 @@ namespace RobloxClientTracker
                     contents = contents.Replace(fullStruct, line);
                 }
 
-                string currentHash = container.GetString(RegistryKey);
+                container.TryGetValue(RegistryKey, out string currentHash);
 
                 if (currentHash != Hash)
                 {
-                    container.SetValue(RegistryKey, Hash);
+                    container[RegistryKey] = Hash;
                     unpacker.WriteShader(shaderPath, contents);
                 }
             }

@@ -93,10 +93,15 @@ namespace RobloxClientTracker
 
         public HashSet<string> UnpackShader(UnpackShaders unpacker, string exportDir)
         {
-            var shaderManifest = Program.BranchRegistry.Open("ShaderManifest");
+            var shaderManifest = Program.state.ShaderManifest;
             string shaderKey = Name.Replace("shaders_", "");
             
-            var shaderReg = shaderManifest.Open(shaderKey);
+            if (!shaderManifest.TryGetValue(shaderKey, out var shaderReg))
+            {
+                shaderReg = new Dictionary<string, string>();
+                shaderManifest[shaderKey] = shaderReg;
+            }
+
             string root = Groups[0];
 
             var hashes = new HashSet<string>();
@@ -138,7 +143,7 @@ namespace RobloxClientTracker
                 }
             }
 
-            string[] oldNames = shaderReg.GetValueNames()
+            string[] oldNames = shaderReg.Keys
                 .Except(names)
                 .ToArray();
 
@@ -149,14 +154,11 @@ namespace RobloxClientTracker
                 if (File.Exists(filePath))
                     File.Delete(filePath);
 
-                shaderReg.DeleteValue(oldName);
+                shaderReg.Remove(oldName);
             }
 
-            if (shaderReg.GetValueNames().Length == 0)
-                shaderManifest.DeleteSubKey(shaderKey);
-
-            shaderReg.Dispose();
-            shaderManifest.Dispose();
+            if (!shaderReg.Any())
+                shaderManifest.Remove(shaderKey);
 
             return hashes;
         }
