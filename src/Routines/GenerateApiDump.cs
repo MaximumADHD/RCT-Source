@@ -43,8 +43,6 @@ namespace RobloxClientTracker
                 {
                     print($"Cloning {apiSite}...");
                     Program.cloneRepo(apiSite);
-
-
                 }
 
                 print("Updating API pages...");
