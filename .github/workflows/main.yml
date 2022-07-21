@@ -35,19 +35,16 @@ jobs:
         shell: cmd
         
       - name:  Create ~/.ssh
-        run:   New-Item -ItemType Directory -Force -Path $env:UserProfile/.ssh
+        run:   New-Item -ItemType Directory -Force -Path ~/.ssh
         shell: pwsh
         
       - name:  Write ~/.ssh/RobloxClientTracker
-        uses: timheuer/base64-to-file@v1.1
-        with:
-          fileName: 'RobloxClientTracker'
-          fileDir: '~/.ssh/RobloxClientTracker'
-          encodedString: ${{ secrets.CLIENT_TRACKER_SSH }}
+        run:   echo $CLIENT_TRACKER_SSH | base64 --decode > ~/.ssh/RobloxClientTracker
+        shell: bash
         
       - name:  (TEMP) Check secret key
-        run:   cat $env:UserProfile/.ssh/RobloxClientTracker
-        shell: pwsh
+        run:   cat ~/.ssh/RobloxClientTracker
+        shell: bash
         
       - name:  Run
         run:   ./RobloxClientTracker.exe -branch sitetest2.robloxlabs -parent sitetest1.robloxlabs
