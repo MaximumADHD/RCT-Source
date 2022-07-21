@@ -6,19 +6,34 @@ on:
 jobs:
   experiment:
     runs-on: windows-latest
-
+    env:
+      CURL: "curl -L -s -o #1"
+      SSH_DIR: "%UserProfile%/.ssh"
+      CLIENT_TRACKER_SSH:  ${{ secrets.CLIENT_TRACKER_SSH }}
     steps:
-      - name: Fetch and Extract Dependencies
-        run: |
-          curl -L -s -o RobloxFileFormat.dll https://github.com/MaximumADHD/Roblox-File-Format/raw/main/RobloxFileFormat.dll
-          curl -L -s -o RobloxDeployHistory.dll https://github.com/MaximumADHD/Roblox-Deploy-History/releases/download/v2022.07.20/RobloxDeployHistory.dll 
-          curl -L -s -o RobloxAPIDumpTool.exe https://github.com/MaximumADHD/Roblox-API-Dump-Tool/raw/main/RobloxAPIDumpTool.exe 
-          curl -L -s -o RobloxStudioModManager.exe https://github.com/MaximumADHD/Roblox-Studio-Mod-Manager/raw/main/RobloxStudioModManager.exe
-          curl -L -s -o RCT.zip https://github.com/MaximumADHD/RCT-Source/releases/download/v2022.07.20/RCT.zip
-          7z x RCT.zip
+      - name: Fetch RobloxFileFormat.dll
+        run:  $CURL https://github.com/MaximumADHD/Roblox-File-Format/raw/main/{RobloxFileFormat.dll}
 
-      - name: List Contents
-        run: ls
+      - name: Fetch RobloxDeployHistory.dll
+        run:  $CURL https://github.com/MaximumADHD/Roblox-Deploy-History/releases/download/v2022.07.20/{RobloxDeployHistory.dll}
+
+      - name: Fetch RobloxAPIDumpTool.exe
+        run:  $CURL https://github.com/MaximumADHD/Roblox-API-Dump-Tool/raw/main/{RobloxAPIDumpTool.exe}
+      
+      - name: Fetch RobloxStudioModManager.exe
+        run:  $CURL https://github.com/MaximumADHD/Roblox-Studio-Mod-Manager/raw/main/{RobloxStudioModManager.exe}
+        
+      - name: Fetch RCT.zip
+        run:  $CURL https://github.com/MaximumADHD/RCT-Source/releases/download/v2022.07.20/{RCT.zip}
+        
+      - name: Extract RCT.zip
+        run:  7z x RCT.zip
+        
+      - name: Create ~/.ssh
+        run:  if not exist "$SSH_DIR" mkdir "$SSH_DIR"
+        
+      - name: Write ~/.ssh/RobloxClientTracker
+        run:  echo $CLIENT_TRACKER_SSH | base64 --decode > $SSH_DIR/RobloxClientTracker
         
       - name: Run
         run: ./RobloxClientTracker.exe -branch sitetest2.robloxlabs -parent sitetest1.robloxlabs
