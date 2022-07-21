@@ -42,7 +42,7 @@ jobs:
         uses: timheuer/base64-to-file@v1.1
         with:
           fileName: 'RobloxClientTracker'
-          filePath: '~/.ssh/RobloxClientTracker'
+          fileDir: '~/.ssh/RobloxClientTracker'
           encodedString: ${{ secrets.CLIENT_TRACKER_SSH }}
         
       - name:  (TEMP) Check secret key
