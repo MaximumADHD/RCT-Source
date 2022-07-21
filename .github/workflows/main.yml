@@ -38,7 +38,7 @@ jobs:
         shell: pwsh
         
       - name: Write ~/.ssh/RobloxClientTracker
-        run:  echo $env:CLIENT_TRACKER_SSH | base64 --decode > $env:UserProfile/.ssh/RobloxClientTracker
+        run:  echo $CLIENT_TRACKER_SSH | base64 --decode > $env:UserProfile/.ssh/RobloxClientTracker
         shell: pwsh
         
       - name: (TEMP) Check secret key
