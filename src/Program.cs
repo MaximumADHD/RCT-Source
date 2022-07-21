@@ -34,6 +34,7 @@ namespace RobloxClientTracker
 
         const string ARG_BRANCH = "-branch";
         const string ARG_PARENT = "-parent";
+        const string ARG_WORK_DIR = "-workDir";
         const string ARG_TRACK_MODE = "-trackMode";
 
         const string ARG_FORCE_REBASE = "-forceRebase";
@@ -65,10 +66,11 @@ namespace RobloxClientTracker
         static bool FORCE_UPDATE = false;
         static bool FORCE_COMMIT = false;
 
-        static int UPDATE_FREQUENCY = 5;
         static bool VERBOSE_GIT_LOGS = false;
         static bool MANUAL_BUILD = false;
 
+        static string PRIVATE_KEY = "";
+        static int UPDATE_FREQUENCY = 5;
         static TrackMode TRACK_MODE = TrackMode.Client;
         static readonly Type DataMiner = typeof(DataMiner);
 
@@ -342,8 +344,22 @@ namespace RobloxClientTracker
             string owner = settings.RepoOwner;
 
             string userProfile = Environment.GetEnvironmentVariable("UserProfile");
-            string privateKey = Path.Combine(userProfile, ".ssh", "RobloxClientTracker")
+            string sshDir = createDirectory(userProfile, ".ssh");
+
+            string privateKey = Path
+                .Combine(sshDir, "RobloxClientTracker")
                 .Replace('\\', '/');
+
+            if (!File.Exists(privateKey) && !string.IsNullOrEmpty(PRIVATE_KEY))
+            {
+                if (PRIVATE_KEY.StartsWith("LS0tL"))
+                {
+                    var buffer = Convert.FromBase64String(PRIVATE_KEY);
+                    PRIVATE_KEY = Encoding.ASCII.GetString(buffer);
+                }
+
+                File.WriteAllText(sshDir, PRIVATE_KEY);
+            }
 
             if (!File.Exists(privateKey))
             {
@@ -376,10 +392,10 @@ namespace RobloxClientTracker
                 cloneRepo(repository);
                 
                 string name = settings.BotName;
-                git("config", "--local", "user.name", $"\"{name}\"");
+                git("config", "user.name", $"\"{name}\"");
 
                 string email = settings.BotEmail;
-                git("config", "--local", "user.email", email);
+                git("config", "user.email", email);
 
                 return true;
             }
@@ -816,9 +832,8 @@ namespace RobloxClientTracker
             if (argMap.ContainsKey(ARG_MANUAL_BUILD))
                 MANUAL_BUILD = true;
 
-            if (argMap.ContainsKey(ARG_UPDATE_FREQUENCY))
-                if (!int.TryParse(argMap[ARG_UPDATE_FREQUENCY], out UPDATE_FREQUENCY))
-                    print($"Bad {ARG_UPDATE_FREQUENCY} provided.", RED);
+            if (argMap.ContainsKey(ARG_WORK_DIR))
+                trunk = argMap[ARG_WORK_DIR];
 
             if (argMap.ContainsKey(ARG_FORCE_VERSION_ID))
                 FORCE_VERSION_ID = argMap[ARG_FORCE_VERSION_ID];
@@ -842,7 +857,10 @@ namespace RobloxClientTracker
             }
             #endregion
 
-            trunk = createDirectory(@"C:\Roblox-Client-Tracker");
+            if (trunk == null)
+                trunk = @"C:\Roblox-Client-Tracker";
+
+            trunk = createDirectory(trunk);
             stageDir = createDirectory(trunk, "stage", branch);
 
             ServicePointManager.SecurityProtocol = SecurityProtocolType.Tls12;
