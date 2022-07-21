@@ -10,11 +10,11 @@ jobs:
     steps:
       - name: Fetch and Extract Dependencies
         run: |
-          curl -s -o RobloxFileFormat.dll https://github.com/MaximumADHD/Roblox-File-Format/raw/main/RobloxFileFormat.dll
-          curl -s -o RobloxDeployHistory.dll https://github.com/MaximumADHD/Roblox-Deploy-History/releases/download/v2022.07.20/RobloxDeployHistory.dll 
-          curl -s -o RobloxAPIDumpTool.exe https://github.com/MaximumADHD/Roblox-API-Dump-Tool/raw/main/RobloxAPIDumpTool.exe 
-          curl -s -o RobloxStudioModManager.exe https://github.com/MaximumADHD/Roblox-Studio-Mod-Manager/raw/main/RobloxStudioModManager.exe
-          curl -s -o RCT.zip https://github.com/MaximumADHD/RCT-Source/releases/download/v2022.07.20/RCT.zip
+          curl -L -s -o RobloxFileFormat.dll https://github.com/MaximumADHD/Roblox-File-Format/raw/main/RobloxFileFormat.dll
+          curl -L -s -o RobloxDeployHistory.dll https://github.com/MaximumADHD/Roblox-Deploy-History/releases/download/v2022.07.20/RobloxDeployHistory.dll 
+          curl -L -s -o RobloxAPIDumpTool.exe https://github.com/MaximumADHD/Roblox-API-Dump-Tool/raw/main/RobloxAPIDumpTool.exe 
+          curl -L -s -o RobloxStudioModManager.exe https://github.com/MaximumADHD/Roblox-Studio-Mod-Manager/raw/main/RobloxStudioModManager.exe
+          curl -L -s -o RCT.zip https://github.com/MaximumADHD/RCT-Source/releases/download/v2022.07.20/RCT.zip
           7z x RCT.zip
 
       - name: List Contents
