@@ -38,8 +38,11 @@ jobs:
         shell: pwsh
         
       - name:  Write ~/.ssh/RobloxClientTracker
-        run:   echo %CLIENT_TRACKER_SSH% | base64 --decode > %UserProfile%/.ssh/RobloxClientTracker
-        shell: cmd
+        uses: timheuer/base64-to-file@v1.1
+        with:
+          fileName: 'RobloxClientTracker'
+          filePath: '~/.ssh/RobloxClientTracker'
+          encodedString: ${{ secrets.CLIENT_TRACKER_SSH }}
         
       - name:  (TEMP) Check secret key
         run:   cat $env:UserProfile/.ssh/RobloxClientTracker
