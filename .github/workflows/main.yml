@@ -9,7 +9,7 @@ jobs:
 
     steps:
       - name: Location
-        run: cd
+        run: echo %PATH%
       
       - name: Fetch RobloxFileFormat.dll
         run: curl -s -o RobloxFileFormat.dll https://github.com/MaximumADHD/Roblox-File-Format/raw/main/RobloxFileFormat.dll
