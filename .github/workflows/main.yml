@@ -24,7 +24,7 @@ jobs:
         run: curl -o RCT.zip https://github.com/MaximumADHD/RCT-Source/releases/download/v2022.07.20/RCT.zip
 
       - name: Extract RCT.zip
-        run: tar -xf RCT.zip
+        run: 7z x RCT.zip
 
       - name: List Contents
         run: ls
