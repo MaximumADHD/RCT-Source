@@ -8,26 +8,26 @@ jobs:
     runs-on: windows-latest
 
     steps:
-      - name: Location
-        run: echo %PATH%
-      
       - name: Fetch RobloxFileFormat.dll
         run: curl -s -o RobloxFileFormat.dll https://github.com/MaximumADHD/Roblox-File-Format/raw/main/RobloxFileFormat.dll
-        
+
       - name: Fetch RobloxDeployHistory.dll
         run: curl -s -o RobloxDeployHistory.dll https://github.com/MaximumADHD/Roblox-Deploy-History/releases/download/v2022.07.20/RobloxDeployHistory.dll 
-        
+
       - name: Fetch RobloxApiDumpTool.exe
         run: curl -s -o RobloxAPIDumpTool.exe https://github.com/MaximumADHD/Roblox-API-Dump-Tool/raw/main/RobloxAPIDumpTool.exe 
-        
+
       - name: Fetch RobloxStudioModManager.exe
         run: curl -s -o RobloxStudioModManager.exe https://github.com/MaximumADHD/Roblox-Studio-Mod-Manager/raw/main/RobloxStudioModManager.exe
 
       - name: Fetch RCT.zip
-        run: curl -s -o RCT.zip https://github.com/MaximumADHD/RCT-Source/releases/download/v2022.07.20/RCT.zip 
-                        
+        run: curl -o RCT.zip https://github.com/MaximumADHD/RCT-Source/releases/download/v2022.07.20/RCT.zip
+
       - name: Extract RCT.zip
         run: tar -xf RCT.zip
-        
-      - name: Run Client Tracker
+
+      - name: List Contents
         run: ls
+        
+      - name: Run
+        run: ./RobloxClientTracker.exe -branch sitetest2.robloxlabs -parent sitetest1.robloxlabs
