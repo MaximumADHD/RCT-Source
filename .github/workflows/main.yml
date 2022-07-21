@@ -42,6 +42,10 @@ jobs:
         run:   echo $CLIENT_TRACKER_SSH | base64 --decode > ~/.ssh/RobloxClientTracker
         shell: bash
         
+      - name:  test
+        run:   echo $env:GITHUB_WORKSPACE
+        shell: pwsh
+        
       - name:  Run Client Tracker
         run:   RobloxClientTracker.exe -branch sitetest2.robloxlabs -parent sitetest1.robloxlabs
         shell: cmd
