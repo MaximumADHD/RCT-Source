@@ -8,6 +8,9 @@ jobs:
     runs-on: windows-latest
 
     steps:
+      - name: Location
+        run: cd
+      
       - name: Fetch RobloxFileFormat.dll
         run: curl -s -o RobloxFileFormat.dll https://github.com/MaximumADHD/Roblox-File-Format/raw/main/RobloxFileFormat.dll
         
