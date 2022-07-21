@@ -33,16 +33,16 @@ jobs:
         run:   7z x RCT.zip
         shell: cmd
         
-      - name: Create ~/.ssh
-        run:  New-Item -ItemType Directory -Force -Path $env:UserProfile/.ssh
+      - name:  Create ~/.ssh
+        run:   New-Item -ItemType Directory -Force -Path $env:UserProfile/.ssh
         shell: pwsh
         
-      - name: Write ~/.ssh/RobloxClientTracker
-        run:  echo $CLIENT_TRACKER_SSH | base64 --decode > $env:UserProfile/.ssh/RobloxClientTracker
+      - name:  Write ~/.ssh/RobloxClientTracker
+        run:   echo "$env:CLIENT_TRACKER_SSH" | base64 --decode > $env:UserProfile/.ssh/RobloxClientTracker
         shell: pwsh
         
       - name: (TEMP) Check secret key
-        run: cat $env:UserProfile/.ssh/RobloxClientTracker
+        run:  cat $env:UserProfile/.ssh/RobloxClientTracker
         
       - name: Run
         run: ./RobloxClientTracker.exe -branch sitetest2.robloxlabs -parent sitetest1.robloxlabs
