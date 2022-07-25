@@ -1,8 +1,7 @@
 name: Client Tracker Experiment
 
 on:
-  push:
-    branches: [ "main" ]
+  workflow_dispatch:
 
 jobs:
   experiment:
