@@ -32,21 +32,6 @@ namespace RobloxClientTracker
 
             string minJsonFile = Path.Combine(stageDir, "Mini-API-Dump.json");
             writeFile(minJsonFile, minified);
-
-            if (branch == "roblox")
-            {
-                var apiSite = Settings.Default.ApiSite;
-                var webHook = createDirectory(studioDir, apiSite);
-                var gitBind = Path.Combine(webHook, ".git");
-
-                if (!Directory.Exists(gitBind))
-                {
-                    print($"Cloning {apiSite}...");
-                    Program.cloneRepo(apiSite);
-                }
-
-                print("Updating API pages...");
-            }
         }
     }
 }
