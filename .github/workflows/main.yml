@@ -1,8 +1,8 @@
 name: Client Tracker Experiment
 
 on:
+  workflow_dispatch:
   push:
-    branches: [ "main" ]
 
 jobs:
   experiment:
@@ -29,22 +29,17 @@ jobs:
       - name:  Fetch RCT.zip
         run:   curl -L -s -o "#1" https://github.com/MaximumADHD/RCT-Source/releases/download/v2022.07.20/{RCT.zip}
         shell: cmd
-        
+
       - name:  Extract RCT.zip
         run:   7z x RCT.zip
         shell: cmd
-        
-      - name:  Create ~/.ssh
-        run:   New-Item -ItemType Directory -Force -Path ~/.ssh
-        shell: pwsh
-        
-      - name:  Write ~/.ssh/RobloxClientTracker
-        run:   echo $CLIENT_TRACKER_SSH | base64 --decode > ~/.ssh/RobloxClientTracker
+
+      - name:  Write Known Hosts
+        run:   ssh-keyscan github.com >> KNOWN_HOSTS
+
+      - name:  Write Private Key
+        run:   echo $CLIENT_TRACKER_SSH | base64 --decode > RCT_DEPLOY
         shell: bash
-        
-      - name:  test
-        run:   echo $env:GITHUB_WORKSPACE
-        shell: pwsh
         
       - name:  Run Client Tracker
         run:   RobloxClientTracker.exe -branch sitetest2.robloxlabs -parent sitetest1.robloxlabs
