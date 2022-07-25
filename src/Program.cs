@@ -167,20 +167,19 @@ namespace RobloxClientTracker
         {
             string dir = Path.Combine(traversal);
 
-            if (!dir.StartsWith(@"\\?\"))
-                dir = @"\\?\" + dir;
-
             if (!Directory.Exists(dir))
                 Directory.CreateDirectory(dir);
 
-            return dir;
+            return dir.Replace("\\", "/");
         }
 
         public static IEnumerable<string> git(params string[] args)
         {
             Directory.SetCurrentDirectory(stageDir);
             string command = string.Join(" ", args);
+
             Process git;
+            print($"git {command}", CYAN);
 
             lock (gitExecute)
             {
@@ -326,13 +325,43 @@ namespace RobloxClientTracker
             }
         }
 
-        public static void initGit(string repoName)
+        public static void cloneRepo(string repository)
         {
-            stageDir = Path.Combine(trunk, repoName);
+            string owner = Settings.Default.RepoOwner;
+
+            string privateKey = Path
+                .Combine(trunk, "RCT_DEPLOY")
+                .Replace("\\", "/");
+
+            string knownHosts = Path
+                .Combine(trunk, "KNOWN_HOSTS")
+                .Replace("\\", "/");
+
+            if (!File.Exists(privateKey))
+            {
+                print("FATAL: Missing SSH Private Key 'RCT_DEPLOY' in working directory!", RED);
+                Environment.Exit(1);
+            }
+
+            string sshCommand = $"ssh -i \"{privateKey}\" -o UserKnownHostsFile={knownHosts}";
+            string repoUrl = $"git@github.com:{owner}/{repository}.git";
+            
+            git($"clone -c core.sshCommand=\"{sshCommand}\" {repoUrl} {stageDir}");
+        }
+
+        public static void initGitBinding(string repository)
+        {
+            string gitBinding = Path.Combine(stageDir, ".git");
             Directory.SetCurrentDirectory(stageDir);
 
-            git("config", "--local", "user.name", Settings.Default.BotName);
-            git("config", "--local", "user.email", Settings.Default.BotEmail);
+            if (!Directory.Exists(gitBinding))
+            {
+                print($"Assembling stage for {branch}...", MAGENTA);
+                cloneRepo(repository);
+            }
+
+            git("config", "--local", "user.name",  $"\"{Settings.Default.BotName}\"");
+            git("config", "--local", "user.email", $"\"{Settings.Default.BotEmail}\"");
         }
 
         static async Task UpdateClientAsync()
@@ -373,7 +402,7 @@ namespace RobloxClientTracker
                 print("Caution: FORCE_COMMIT is set to true!", YELLOW);
 
             // Check if the parent branch has been updated
-            initGit(Settings.Default.ClientRepoName);
+            initGitBinding(Settings.Default.ClientRepoName);
 
             if (branch != parent)
             {
@@ -524,7 +553,7 @@ namespace RobloxClientTracker
         {
             // Initialize Repository
             const string fflagEndpoint = "https://clientsettingscdn.roblox.com/v1/settings/application?applicationName=";
-            initGit(Settings.Default.FFlagRepoName);
+            initGitBinding(Settings.Default.FFlagRepoName);
 
             var taskPool = new List<Task>();
             var sets = new ConcurrentDictionary<string, Dictionary<string, string>>();
@@ -714,6 +743,7 @@ namespace RobloxClientTracker
 
             Task mainThread = null;
             trunk = Directory.GetCurrentDirectory();
+            stageDir = createDirectory(trunk, "stage");
 
             if (TRACK_MODE == TrackMode.Client)
                 mainThread = Task.Run(UpdateClientAsync);
