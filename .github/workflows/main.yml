@@ -37,6 +37,7 @@ jobs:
         with:
           repository: 'MaximumADHD/Roblox-Client-Tracker'
           ssh-key: ${{ secrets.CLIENT_TRACKER_SSH }}
+          path: 'Roblox-Client-Tracker'
           ref: 'sitetest2.robloxlabs'
         
       - name:  Run Client Tracker
