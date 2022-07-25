@@ -7,8 +7,6 @@ on:
 jobs:
   experiment:
     runs-on: windows-latest
-    env:
-      CLIENT_TRACKER_SSH:  ${{ secrets.CLIENT_TRACKER_SSH }}
     steps:
       - name:  Fetch RobloxFileFormat.dll
         run:   curl -L -s -o "#1" https://github.com/MaximumADHD/Roblox-File-Format/raw/main/{RobloxFileFormat.dll}
@@ -33,18 +31,13 @@ jobs:
       - name:  Extract RCT.zip
         run:   7z x RCT.zip
         shell: cmd
-        
-      - name:  Create ~/.ssh
-        run:   New-Item -ItemType Directory -Force -Path ~/.ssh
-        shell: pwsh
-        
-      - name:  Write ~/.ssh/RobloxClientTracker
-        run:   echo $CLIENT_TRACKER_SSH | base64 --decode > ~/.ssh/RobloxClientTracker
-        shell: bash
-        
-      - name:  test
-        run:   echo $env:GITHUB_WORKSPACE
-        shell: pwsh
+      
+      - name:  Checkout Roblox-Client-Tracker
+        uses:  actions/checkout@v3
+        with:
+          repository: 'MaximumADHD/Roblox-Client-Tracker'
+          ssh-key: ${{ secrets.CLIENT_TRACKER_SSH }}
+          ref: 'sitetest2.robloxlabs'
         
       - name:  Run Client Tracker
         run:   RobloxClientTracker.exe -branch sitetest2.robloxlabs -parent sitetest1.robloxlabs
