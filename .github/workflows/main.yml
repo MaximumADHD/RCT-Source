@@ -1,0 +1,46 @@
+name: Client Tracker Experiment
+
+on:
+  workflow_dispatch:
+  push:
+
+jobs:
+  experiment:
+    runs-on: windows-latest
+    env:
+      CLIENT_TRACKER_SSH:  ${{ secrets.CLIENT_TRACKER_SSH }}
+    steps:
+      - name:  Fetch RobloxFileFormat.dll
+        run:   curl -L -s -o "#1" https://github.com/MaximumADHD/Roblox-File-Format/raw/main/{RobloxFileFormat.dll}
+        shell: cmd
+        
+      - name:  Fetch RobloxDeployHistory.dll
+        run:   curl -L -s -o "#1" https://github.com/MaximumADHD/Roblox-Deploy-History/releases/download/v2022.07.20/{RobloxDeployHistory.dll}
+        shell: cmd
+        
+      - name:  Fetch RobloxAPIDumpTool.exe
+        run:   curl -L -s -o "#1" https://github.com/MaximumADHD/Roblox-API-Dump-Tool/raw/main/{RobloxAPIDumpTool.exe}
+        shell: cmd
+        
+      - name:  Fetch RobloxStudioModManager.exe
+        run:   curl -L -s -o "#1" https://github.com/MaximumADHD/Roblox-Studio-Mod-Manager/raw/main/{RobloxStudioModManager.exe}
+        shell: cmd
+        
+      - name:  Fetch RCT.zip
+        run:   curl -L -s -o "#1" https://github.com/MaximumADHD/RCT-Source/releases/download/v2022.07.20/{RCT.zip}
+        shell: cmd
+
+      - name:  Extract RCT.zip
+        run:   7z x RCT.zip
+        shell: cmd
+
+      - name:  Write Known Hosts
+        run:   ssh-keyscan github.com >> KNOWN_HOSTS
+
+      - name:  Write Private Key
+        run:   echo $CLIENT_TRACKER_SSH | base64 --decode > RCT_DEPLOY
+        shell: bash
+        
+      - name:  Run Client Tracker
+        run:   RobloxClientTracker.exe -branch sitetest2.robloxlabs -parent sitetest1.robloxlabs
+        shell: cmd

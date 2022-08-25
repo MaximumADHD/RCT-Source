@@ -1,4 +1,3 @@
 ﻿{
-  "FFlagLuauUseInstanceClassDescriptors": true,
-  "FFlagStudioUseInstanceClassDescriptorsInApiDumper": true
+  "FFlagIncludeLegacyNamesInJsonApiDump": true
 }

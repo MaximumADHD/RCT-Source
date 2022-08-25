@@ -35,6 +35,9 @@ namespace RobloxClientTracker
                 state = new ClientTrackerState();
             }
 
+            if (state == null)
+                state = new ClientTrackerState();
+
             return state;
         }
 

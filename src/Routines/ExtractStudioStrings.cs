@@ -6,6 +6,7 @@ using System.Linq;
 using System.Runtime.InteropServices;
 using System.Text;
 using System.Text.RegularExpressions;
+using System.Threading.Tasks;
 
 #pragma warning disable IDE1006 // Naming Styles
 
@@ -51,7 +52,13 @@ namespace RobloxClientTracker
         };
 
         public override ConsoleColor LogColor => ConsoleColor.Magenta;
+        private const short segmentOverrun = 512;
+        private const byte maxThreads = 32;
+
         private string studioExe;
+        private int segmentSize;
+
+        private static readonly object undecorate = new object();
 
         public override void ExecuteRoutine()
         {
@@ -60,6 +67,7 @@ namespace RobloxClientTracker
 
             print("Reading Roblox Studio...");
             studioExe = File.ReadAllText(studioPath);
+            segmentSize = studioExe.Length / maxThreads;
 
             // Now execute the routines.
             addRoutine(extractCppTypes);
@@ -95,18 +103,42 @@ namespace RobloxClientTracker
             return lines.OrderBy(line => line);
         }
 
+        private string getSegment(int i)
+        {
+            int begin = i * segmentSize;
+            int length = segmentSize + segmentOverrun;
+            string capture;
+
+            if (i < maxThreads - 1)
+                capture = studioExe.Substring(begin, length);
+            else
+                capture = studioExe.Substring(begin);
+
+            return capture;
+        }
+
         private void extractDeepStrings()
         {
             print("Extracting Deep Strings...");
+            var lines = new ConcurrentBag<string>();
 
-            var matches = Regex.Matches(studioExe, "([A-Z][A-z][A-z_0-9.]{8,256})+[A-z0-9]?");
+            Parallel.For(0, maxThreads, i =>
+            {
+                var segment = getSegment(i);
+                var matches = Regex.Matches(segment, "([A-Z][A-z][A-z_0-9.]{8,256})+[A-z0-9]?");
 
-            var lines = matches.Cast<Match>()
-                .Select(match => match.Value)
-                .OrderBy(str => str)
+                var set = matches.Cast<Match>()
+                    .Select(match => match.Value)
+                    .ToList();
+
+                set.ForEach(lines.Add);
+            });
+
+            var sorted = lines
+                .OrderBy(line => line)
                 .Distinct();
 
-            string deepStrings = string.Join("\n", lines);
+            string deepStrings = string.Join("\n", sorted);
             string deepStringsPath = Path.Combine(stageDir, "DeepStrings.txt");
 
             writeFile(deepStringsPath, deepStrings);
@@ -115,34 +147,43 @@ namespace RobloxClientTracker
         private void extractCppTypes()
         {
             print("Extracting CPP types...");
+            var lines = new ConcurrentBag<string>();
 
-            var classes = hackOutPattern(studioExe, "(AV|AW4)[A-z0-9_@\\?\\$]+");
-            var lines = new List<string>();
-
-            foreach (string symbol in classes)
+            Parallel.For(0, maxThreads, i =>
             {
-                string data = '?' + symbol;
+                var segment = getSegment(i);
+                var classes = hackOutPattern(segment, "(AV|AW4)[A-z0-9_@\\?\\$]+");
 
-                if (data.ToUpperInvariant().EndsWith("@@", Program.InvariantString))
+                foreach (string symbol in classes)
                 {
-                    var output = new StringBuilder(8192);
-                    UnDecorateSymbolName(data, output, 8192, UnDecorateFlags.UNDNAME_NO_ARGUMENTS);
+                    string data = '?' + symbol;
 
-                    string result = output.ToString();
-
-                    if (result == data)
-                        continue;
-
-                    foreach (string complex in TypeSimplify.Keys)
+                    if (data.ToUpperInvariant().EndsWith("@@", Program.InvariantString))
                     {
-                        string simple = TypeSimplify[complex];
-                        result = result.Replace(complex, simple);
+                        var output = new StringBuilder(8192);
+
+                        lock (undecorate)
+                            UnDecorateSymbolName(data, output, 8192, UnDecorateFlags.UNDNAME_NO_ARGUMENTS);
+
+                        string result = output.ToString();
+
+                        if (result == data)
+                            continue;
+
+                        foreach (string complex in TypeSimplify.Keys)
+                        {
+                            string simple = TypeSimplify[complex];
+                            result = result.Replace(complex, simple);
+                        }
+
+                        if (result.Length < 6)
+                            continue;
+
+                        lines.Add(result.Substring(6));
                     }
-
-                    lines.Add(result.Substring(6));
                 }
-            }
-
+            });
+            
             string cppTree = string.Join("\r\n", lines
                 .OrderBy(line => line)
                 .Distinct());
