@@ -34,6 +34,7 @@ namespace RobloxClientTracker
 
         const string ARG_BRANCH = "-branch";
         const string ARG_PARENT = "-parent";
+        const string ARG_CHANNEL = "-channel";
         const string ARG_TRACK_MODE = "-trackMode";
 
         const string ARG_FORCE_REBASE = "-forceRebase";
@@ -145,6 +146,7 @@ namespace RobloxClientTracker
 
         public static string branch = "roblox";
         public static string parent = "roblox";
+        public static string channel;
 
         public static string trunk { get; private set; }
         public static string stageDir { get; private set; }
@@ -453,7 +455,7 @@ namespace RobloxClientTracker
 
             studio = new StudioBootstrapper(state)
             {
-                Branch = branch,
+                Channel = channel,
                 GenerateMetadata = true,
                 RemapExtraContent = true,
                 CanShutdownStudio = false,
@@ -537,33 +539,13 @@ namespace RobloxClientTracker
                 }
 
                 // Check for updates to the version
-                ClientVersionInfo info = null;
-
-                if (MANUAL_BUILD)
-                {
-                    print($"WARNING: Using manual build for branch {branch}!");
-
-                    string buildDir = Path.Combine(trunk, "builds", branch);
-                    string versionFile = Path.Combine(buildDir, "version.txt");
-
-                    if (!File.Exists(versionFile))
-                        throw new Exception($"MISSING FILE {versionFile}");
-
-                    const string versionGuid = "version-$guid";
-                    string version = File.ReadAllText(versionFile);
-
-                    info = new ClientVersionInfo(version, versionGuid);
-                }
-                else
-                {
-                    info = await StudioBootstrapper.GetCurrentVersionInfo(branch, state.VersionData);
-                }
-
+                ClientVersionInfo info = await StudioBootstrapper.GetCurrentVersionInfo(channel, state.VersionData);
+                
                 if (!string.IsNullOrEmpty(FORCE_VERSION_ID))
-                    info = new ClientVersionInfo(FORCE_VERSION_ID, info.VersionGuid);
+                    info = new ClientVersionInfo(channel, FORCE_VERSION_ID, info.VersionGuid);
 
                 if (!string.IsNullOrEmpty(FORCE_VERSION_GUID))
-                    info = new ClientVersionInfo(info.Version, FORCE_VERSION_GUID);
+                    info = new ClientVersionInfo(channel, info.Version, FORCE_VERSION_GUID);
 
                 if (FORCE_UPDATE || MANUAL_BUILD || info.VersionGuid != state.Version)
                 {
@@ -585,18 +567,8 @@ namespace RobloxClientTracker
                         string destination = Path.Combine(stageDir, fileName);
 
                         if (!File.Exists(sourcePath))
-                        {
-                            string errorMsg = $"Missing file to copy: {sourcePath}!!";
-
-                            if (MANUAL_BUILD)
-                            {
-                                print(errorMsg, YELLOW);
-                                continue;
-                            }
-
-                            throw new Exception(errorMsg);
-                        }
-
+                            throw new Exception($"Missing file to copy: {sourcePath}!!");
+                        
                         if (File.Exists(destination))
                             File.Delete(destination);
 
@@ -710,7 +682,7 @@ namespace RobloxClientTracker
                                 json = await http.DownloadStringTaskAsync(fflagEndpoint + platform);
                             }
                         }
-                        catch (Exception e)
+                        catch
                         {
                             print($"\tError fetching FFlag platform: {platform}!", RED);
                             return;
@@ -845,6 +817,9 @@ namespace RobloxClientTracker
             if (argMap.ContainsKey(ARG_BRANCH))
                 branch = argMap[ARG_BRANCH];
 
+            if (argMap.ContainsKey(ARG_CHANNEL))
+                channel = argMap[ARG_CHANNEL];
+
             if (argMap.ContainsKey(ARG_PARENT))
                 parent = argMap[ARG_PARENT];
 
@@ -891,6 +866,29 @@ namespace RobloxClientTracker
 
             trunk = createDirectory(@"C:\Roblox-Client-Tracker");
             stageDir = createDirectory(trunk, "stage", branch);
+
+            if (channel == null)
+            {
+                switch (branch)
+                {
+                    case "roblox":
+                    {
+                        // TODO: Switch back to zLive??
+                        channel = "zQtitanStudioRelease";
+                        break;
+                    }
+                    case "sitetest1.robloxlabs":
+                    {
+                        channel = "zCanary";
+                        break;
+                    }
+                    case "sitetest2.robloxlabs":
+                    {
+                        channel = "zIntegration";
+                        break;
+                    }
+                }
+            }
 
             ServicePointManager.SecurityProtocol = SecurityProtocolType.Tls12;
             Task mainThread = null;

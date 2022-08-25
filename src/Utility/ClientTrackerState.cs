@@ -9,9 +9,8 @@ namespace RobloxClientTracker
 {
     public class ClientTrackerState : IBootstrapperState
     {
+        public string Channel { get; set; } = "";
         public string Version { get; set; } = "";
-        public bool DeprecateMD5 { get; set; } = true;
-        public string BuildBranch { get; set; } = "roblox";
 
         public VersionManifest VersionData { get; set; } = new VersionManifest();
         public Dictionary<string, string> FileManifest { get; set; } = new Dictionary<string, string>();
