@@ -6,16 +6,32 @@ using System.Linq;
 
 namespace RobloxClientTracker
 {
+    public class ShaderDef
+    {
+        public string Name;
+        public uint Mask;
+
+        public override string ToString()
+        {
+            string bits = Convert
+                .ToString(Mask, 16)
+                .PadLeft(8, '0');
+
+            return $"{Name}_{bits}";
+        }
+    }
+
     public class ShaderPack
     {
         public string Name { get; private set; }
-        public int Hash { get; private set; }
+        public uint Hash { get; private set; }
 
         public string Header { get; private set; }
-        public int Version { get; private set; }
+        public ushort Version { get; private set; }
 
-        public short NumGroups { get; private set; }
-        public short NumShaders { get; private set; }
+        public ushort NumGroups { get; private set; }
+        public ushort NumShaders { get; private set; }
+        public ushort NumUnknown { get; private set; }
 
         private readonly string[] GroupsImpl;
         private readonly ShaderFile[] ShadersImpl;
@@ -35,14 +51,21 @@ namespace RobloxClientTracker
             using (FileStream file = File.OpenRead(filePath))
             using (BinaryReader reader = new BinaryReader(file))
             {
+                uint numNames = 0;
                 Header = reader.ReadString(4);
-                Version = reader.ReadInt32();
+                Version = reader.ReadUInt16();
 
-                NumGroups = reader.ReadInt16();
-                NumShaders = reader.ReadInt16();
+                NumGroups = reader.ReadUInt16();
+                NumShaders = reader.ReadUInt16();
+
+                if (Version >= 9)
+                {
+                    numNames = NumShaders;
+                    NumShaders = reader.ReadUInt16();
+                }
 
                 Name = info.Name.Replace(info.Extension, "");
-                Hash = reader.ReadInt32();
+                Hash = reader.ReadUInt32();
 
                 GroupsImpl = new string[NumGroups];
                 ShadersImpl = new ShaderFile[NumShaders];
@@ -51,34 +74,54 @@ namespace RobloxClientTracker
                 for (int i = 0; i < NumGroups; i++)
                     GroupsImpl[i] = reader.ReadString(64);
 
-                // Read Shaders
+                // Read Names
+                var names = new ShaderDef[numNames];
+
+                for (int i = 0; i < numNames; i++)
+                {
+                    names[i] = new ShaderDef()
+                    {
+                        Name = reader.ReadString(64),
+                        Mask = reader.ReadUInt32(),
+                    };
+                }
+
                 for (int i = 0; i < NumShaders; i++)
                 {
-                    string name = reader.ReadString(64);
+                    string name = "";
+
+                    if (Version < 9)
+                        name = reader.ReadString(64);
 
                     byte[] rawHash = reader.ReadBytes(16);
                     string hash = Convert.ToBase64String(rawHash);
 
                     var shader = new ShaderFile
                     {
-                        Name = name,
                         Hash = hash,
-
                         Offset = reader.ReadInt32(),
                         Size = reader.ReadInt32(),
                     };
 
                     if (Version > 6)
-                        shader.Level = reader.ReadInt32();
+                        shader.Mask = reader.ReadInt32();
 
                     shader.ShaderType = (ShaderType)reader.ReadByte();
                     shader.Group = Groups[reader.ReadByte()];
 
-                    if (Version > 6)
-                        shader.Stub = reader.ReadBytes(2);
+                    if (Version >= 9)
+                    {
+                        ushort nameIndex = reader.ReadUInt16();
+                        var nameInfo = names[nameIndex];
+                        name = nameInfo.Name;
+                    }
                     else
-                        shader.Stub = reader.ReadBytes(6);
+                    {
+                        int skip = Version > 6 ? 2 : 6;
+                        shader.Stub = reader.ReadBytes(skip);
+                    }
 
+                    shader.Name = name;
                     ShadersImpl[i] = shader;
                 }
 
@@ -88,7 +131,7 @@ namespace RobloxClientTracker
                     file.Position = shader.Offset;
                     shader.Buffer = reader.ReadBytes(shader.Size);
                 }
-            }   
+            }
         }
 
         public HashSet<string> UnpackShader(UnpackShaders unpacker, string exportDir)

@@ -34,18 +34,18 @@ namespace RobloxClientTracker
         public byte[] Stub { get; set; }
         public byte[] Buffer { get; set; }
 
-        public int Level { get; set; }
+        public int Mask { get; set; }
 
         public string Id
         {
             get
             {
-                string level = "";
+                string bits = "";
 
                 if (Name.EndsWith("_"))
-                    level = $"Level{Level}";
+                    bits = Convert.ToString(Mask, 16).PadLeft(8, '0');
 
-                return $"{Name}{level}";
+                return $"{Name}{bits}";
             }
         }
 
@@ -66,8 +66,8 @@ namespace RobloxClientTracker
             {
                 var other = obj as ShaderFile;
 
-                if (Name == other.Name && Level != other.Level)
-                    return Level - other.Level;
+                if (Name == other.Name && Mask != other.Mask)
+                    return Mask - other.Mask;
 
                 return string.Compare(Id, other.Id, Program.InvariantString);
             }
@@ -132,7 +132,7 @@ namespace RobloxClientTracker
 
                 container.TryGetValue(RegistryKey, out string currentHash);
 
-                if (currentHash != Hash)
+                if (currentHash != Hash || !File.Exists(shaderPath))
                 {
                     container[RegistryKey] = Hash;
                     unpacker.WriteShader(shaderPath, contents);

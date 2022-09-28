@@ -59,7 +59,9 @@ namespace RobloxClientTracker
 
                         if (info.Length > 0)
                         {
-                            update.Kill();
+                            if (!update.HasExited)
+                                update.Kill();
+
                             break;
                         }
 

@@ -20,16 +20,14 @@ namespace RobloxClientTracker
             Stack = 2
         };
 
-        public static string ResetDirectory(params string[] traversal) => resetDirectory(traversal);
         public void WriteShader(string path, string contents) => writeFile(path, contents, LogShader);
-
         public bool HasHeaderFile(string header) => writtenHeaders.Contains(header);
         public bool AddHeaderFile(string header) => writtenHeaders.Add(header);
 
         public override void ExecuteRoutine()
         {
             string studioDir = studio.GetLocalStudioDirectory();
-            string shaderDir = Path.Combine(studioDir, "shaders");
+            string shaderDir = createDirectory(studioDir, "shaders");
 
             var names = new List<string>();
             var shaders = new Dictionary<string, string>();
@@ -37,7 +35,7 @@ namespace RobloxClientTracker
             var shaderPacks = new Dictionary<string, HashSet<string>>();
             var fileLookup = new Dictionary<string, ShaderFile>();
 
-            string newShaderDir = createDirectory(stageDir, "shaders");
+            string newShaderDir = resetDirectory(stageDir, "shaders");
             IncludeDir = createDirectory(newShaderDir, "include");
 
             print("Unpacking shader packs...");

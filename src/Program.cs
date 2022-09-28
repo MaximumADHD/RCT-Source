@@ -146,7 +146,7 @@ namespace RobloxClientTracker
 
         public static string branch = "roblox";
         public static string parent = "roblox";
-        public static string channel;
+        public static Channel channel = "LIVE";
 
         public static string trunk { get; private set; }
         public static string stageDir { get; private set; }
@@ -579,6 +579,7 @@ namespace RobloxClientTracker
                     // so they don't block each other.
 
                     var routines = new List<Task>();
+                    state.Save(studioDir);
 
                     foreach (DataMiner miner in dataMiners)
                     {
@@ -867,24 +868,28 @@ namespace RobloxClientTracker
             trunk = createDirectory(@"C:\Roblox-Client-Tracker");
             stageDir = createDirectory(trunk, "stage", branch);
 
-            if (channel == null)
+            if (branch == null)
             {
-                switch (branch)
+                switch (channel.Name)
                 {
-                    case "roblox":
+                    case "live":
                     {
-                        // TODO: Switch back to zLive??
-                        channel = "zQtitanStudioRelease";
+                        branch = "roblox";
+                        parent = "roblox";
                         break;
                     }
-                    case "sitetest1.robloxlabs":
+
+                    case "zcanary":
                     {
-                        channel = "zCanary";
+                        branch = "zCanary";
+                        parent = "roblox";
                         break;
                     }
-                    case "sitetest2.robloxlabs":
+
+                    case "zintegration":
                     {
-                        channel = "zIntegration";
+                        branch = "zIntegration";
+                        parent = "zCanary";
                         break;
                     }
                 }
