@@ -32,7 +32,6 @@ namespace RobloxClientTracker
 
         public static readonly Encoding UTF8 = new UTF8Encoding(false);
 
-        const string ARG_BRANCH = "-branch";
         const string ARG_PARENT = "-parent";
         const string ARG_CHANNEL = "-channel";
         const string ARG_TRACK_MODE = "-trackMode";
@@ -108,6 +107,7 @@ namespace RobloxClientTracker
             "version.txt",
             "version-guid.txt",
 
+            "CppTree.txt",
             "DeepStrings.txt",
         };
 
@@ -815,9 +815,6 @@ namespace RobloxClientTracker
             if (!string.IsNullOrEmpty(argKey))
                 argMap.Add(argKey, "");
 
-            if (argMap.ContainsKey(ARG_BRANCH))
-                branch = argMap[ARG_BRANCH];
-
             if (argMap.ContainsKey(ARG_CHANNEL))
                 channel = argMap[ARG_CHANNEL];
 
@@ -865,24 +862,18 @@ namespace RobloxClientTracker
             }
             #endregion
 
-            trunk = createDirectory(@"C:\Roblox-Client-Tracker");
-            stageDir = createDirectory(trunk, "stage", branch);
-
-            if (branch == null)
+            if (TRACK_MODE == TrackMode.Client)
             {
                 switch (channel.Name)
                 {
                     case "live":
                     {
-                        branch = "roblox";
-                        parent = "roblox";
+                        // Nothing to change.
                         break;
                     }
-
                     case "zcanary":
                     {
                         branch = "zCanary";
-                        parent = "roblox";
                         break;
                     }
 
@@ -892,8 +883,18 @@ namespace RobloxClientTracker
                         parent = "zCanary";
                         break;
                     }
+
+                    default:
+                    {
+                        branch = channel.Name;
+                        parent = "zIntegration";
+                        break;
+                    }
                 }
             }
+
+            trunk = createDirectory(@"C:\Roblox-Client-Tracker");
+            stageDir = createDirectory(trunk, "stage", branch);
 
             ServicePointManager.SecurityProtocol = SecurityProtocolType.Tls12;
             Task mainThread = null;

@@ -31,7 +31,7 @@ namespace RobloxClientTracker
             }
             catch
             {
-                Program.log("Couldn't find/load bootstrapper state, creating new one.", ConsoleColor.Red);
+                Program.print("Couldn't find/load bootstrapper state, creating new one.", ConsoleColor.Red);
                 state = new ClientTrackerState();
             }
 
