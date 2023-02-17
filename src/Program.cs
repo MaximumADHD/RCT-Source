@@ -117,6 +117,7 @@ namespace RobloxClientTracker
             "version-guid.txt",
 
             "API-Dump.json",
+            "Full-API-Dump.json",
 
             "rbxManifest.txt",
             "rbxPkgManifest.txt",
