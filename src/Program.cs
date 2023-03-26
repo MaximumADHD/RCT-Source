@@ -464,8 +464,8 @@ namespace RobloxClientTracker
             };
 
             studioPath = studio.GetLocalStudioPath();
-            studio.EchoFeed += new MessageEventHandler((sender, e) => print(e.Message, YELLOW));
-            studio.StatusChanged += new MessageEventHandler((sender, e) => print(e.Message, MAGENTA));
+            studio.EchoFeed += new MessageFeed((msg) => print(msg, YELLOW));
+            studio.StatusFeed += new MessageFeed((msg) => print(msg, MAGENTA));
 
             var dataMiners = AppDomain.CurrentDomain
                 .GetAssemblies()

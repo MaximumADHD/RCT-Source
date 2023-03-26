@@ -82,7 +82,12 @@ namespace RobloxClientTracker
                     }
                 }
 
-                value = luaFile.Source;
+                var source = luaFile.Source;
+
+                if (source.IsCompiled)
+                    extension += "c";
+
+                value = source;
             }
             else if (inst is StringValue str && inst.Name != "AvatarPartScaleType")
             {

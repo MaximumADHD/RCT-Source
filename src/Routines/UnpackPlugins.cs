@@ -26,7 +26,7 @@ namespace RobloxClientTracker
         {
             string studioDir = studio.GetLocalStudioDirectory();
 
-            string srcFolder = Path.Combine(studioDir, folderName);
+            string srcFolder = Path.Combine(studioDir, folderName, "Optimized_Embedded_Signature");
             string destFolder = Path.Combine(stageDir, folderName);
 
             print($"\tCopying {srcFolder} to {destFolder}");
