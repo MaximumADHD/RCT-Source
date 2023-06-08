@@ -46,6 +46,7 @@ namespace RobloxClientTracker
 
         const string ARG_FORCE_VERSION_ID = "-forceVersionId";
         const string ARG_FORCE_VERSION_GUID = "-forceVersionGuid";
+        const string ARG_UPDATE_GITHUB_PAGE = "-updateGitHubPage";
         const string ARG_FORCE_PACKAGE_ANALYSIS = "-forcePackageAnalysis";
 
         public const ConsoleColor DARK_YELLOW = ConsoleColor.DarkYellow;
@@ -72,6 +73,7 @@ namespace RobloxClientTracker
         static TrackMode TRACK_MODE = TrackMode.Client;
         static readonly Type DataMiner = typeof(DataMiner);
 
+        public static bool UPDATE_GITHUB_PAGE = false;
         public static bool FORCE_PACKAGE_ANALYSIS = false;
         public static string FORCE_VERSION_GUID = "";
         public static string FORCE_VERSION_ID = "";
@@ -339,7 +341,7 @@ namespace RobloxClientTracker
             }
         }
 
-        public static void cloneRepo(string repository)
+        public static void cloneRepo(string repository, string stageDir)
         {
             var settings = Settings.Default;
             string owner = settings.RepoOwner;
@@ -368,15 +370,19 @@ namespace RobloxClientTracker
             git($"clone -c core.sshCommand=\"{sshCommand}\" {repoUrl} {stageDir}");
         }
 
-        public static bool initGitBinding(string repository)
+        public static bool initGitBinding(string repository, bool soloBranched = false)
         {
-            var settings = Settings.Default;
-            string gitBinding = Path.Combine(stageDir, ".git");
+            string localStageDir = soloBranched
+                ? createDirectory(trunk, "stage", repository) 
+                : stageDir;
+
+            string gitBinding = Path.Combine(localStageDir, ".git");
 
             if (!Directory.Exists(gitBinding))
             {
-                print($"Assembling stage for {branch}...", MAGENTA);
-                cloneRepo(repository);
+                var settings = Settings.Default;
+                print($"Assembling {repository} stage @ {localStageDir}...", MAGENTA);
+                cloneRepo(repository, localStageDir);
                 
                 string name = settings.BotName;
                 git("config", "--local", "user.name", $"\"{name}\"");
@@ -432,6 +438,9 @@ namespace RobloxClientTracker
 
         static Task TrackClientAsync()
         {
+            if (UPDATE_GITHUB_PAGE)
+                initGitBinding(Settings.Default.ApiSite, true);
+
             // Initialize the git repository.
             bool init = initGitBinding(Settings.Default.ClientRepoName);
 
@@ -613,6 +622,25 @@ namespace RobloxClientTracker
                     if (exceptions.Count > 0)
                         throw new AggregateException(exceptions);
                     
+                    if (UPDATE_GITHUB_PAGE)
+                    {
+                        string pageDir = Path.Combine(trunk, "stage", Settings.Default.ApiSite);
+                        print("Updating API page...");
+
+                        string versionId = info.Version
+                            .Split('.')
+                            .Skip(1)
+                            .First();
+
+                        await RobloxApiDumpTool.ArgProcessor.Run(new Dictionary<string, string>()
+                        {
+                            { "-updatePages", pageDir },
+                            { "-version", versionId }
+                        });
+
+                        Directory.SetCurrentDirectory(stageDir);
+                    }
+
                     if (MANUAL_BUILD)
                     {
                         print($"Stage assembled! Please create a commit with -m \"{info.Version}\"!", GREEN);
@@ -853,6 +881,9 @@ namespace RobloxClientTracker
             if (argMap.ContainsKey(ARG_TRACK_MODE))
                 if (!Enum.TryParse(argMap[ARG_TRACK_MODE], out TRACK_MODE))
                     print($"Bad {ARG_TRACK_MODE} provided.", RED);
+
+            if (argMap.ContainsKey(ARG_UPDATE_GITHUB_PAGE))
+                UPDATE_GITHUB_PAGE = true;
 
             if (TRACK_MODE == TrackMode.FastFlags)
             {
