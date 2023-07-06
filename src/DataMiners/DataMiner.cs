@@ -30,6 +30,8 @@ namespace RobloxClientTracker
         protected static string trunk => Program.trunk;
 
         protected IEnumerable<string> git(params string[] args) => Program.git(args);
+        protected IEnumerable<string> cmd(string workDir, string name, params string[] args) => Program.cmd(workDir, name, args);
+
         protected void print(string message, ConsoleColor? color = null) => Program.print(message, color ?? LogColor);
         protected static string createDirectory(params string[] traversal) => Program.createDirectory(traversal);
         

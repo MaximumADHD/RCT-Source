@@ -107,18 +107,12 @@
     </None>
     <None Include="Resources\ClientAppSettings.json" />
     <None Include="Resources\Icons.res" />
-    <None Include="Resources\LuaJIT.zip" />
-    <None Include="Resources\Lua\BinaryReader.lua" />
-    <None Include="Resources\Lua\Bit.lua" />
-    <None Include="Resources\Lua\Deflate.lua" />
-    <None Include="Resources\Lua\PEParser.lua" />
-    <None Include="Resources\Lua\QtExtract.lua" />
   </ItemGroup>
   <ItemGroup>
     <EmbeddedResource Include="Properties\Resources.resx">
       <Generator>ResXFileCodeGenerator</Generator>
-      <LastGenOutput>Resources.Designer.cs</LastGenOutput>
       <SubType>Designer</SubType>
+      <LastGenOutput>Resources.Designer.cs</LastGenOutput>
     </EmbeddedResource>
   </ItemGroup>
   <ItemGroup>

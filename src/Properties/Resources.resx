@@ -118,25 +118,7 @@
     <value>System.Resources.ResXResourceWriter, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
   </resheader>
   <assembly alias="System.Windows.Forms" name="System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089" />
-  <data name="BinaryReader_lua" type="System.Resources.ResXFileRef, System.Windows.Forms">
-    <value>..\Resources\Lua\BinaryReader.lua;System.Byte[], mscorlib, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
-  </data>
-  <data name="Bit_lua" type="System.Resources.ResXFileRef, System.Windows.Forms">
-    <value>..\Resources\Lua\Bit.lua;System.Byte[], mscorlib, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
-  </data>
   <data name="ClientAppSettings_json" type="System.Resources.ResXFileRef, System.Windows.Forms">
     <value>..\Resources\ClientAppSettings.json;System.Byte[], mscorlib, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
-  </data>
-  <data name="Deflate_lua" type="System.Resources.ResXFileRef, System.Windows.Forms">
-    <value>..\Resources\Lua\Deflate.lua;System.Byte[], mscorlib, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
-  </data>
-  <data name="LuaJIT_zip" type="System.Resources.ResXFileRef, System.Windows.Forms">
-    <value>..\Resources\LuaJIT.zip;System.Byte[], mscorlib, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
-  </data>
-  <data name="PEParser_lua" type="System.Resources.ResXFileRef, System.Windows.Forms">
-    <value>..\Resources\Lua\PEParser.lua;System.Byte[], mscorlib, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
-  </data>
-  <data name="QtExtract_lua" type="System.Resources.ResXFileRef, System.Windows.Forms">
-    <value>..\Resources\Lua\QtExtract.lua;System.Byte[], mscorlib, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
   </data>
 </root>

@@ -41,7 +41,7 @@ namespace RobloxClientTracker
         const string ARG_FORCE_COMMIT = "-forceCommit";
         const string ARG_MANUAL_BUILD = "-manualBuild";
 
-        const string ARG_VERBOSE_GIT_LOGS = "-verboseGitLogs";
+        const string ARG_VERBOSE_LOGS = "-verboseLogs";
         const string ARG_UPDATE_FREQUENCY = "-updateFrequency";
 
         const string ARG_FORCE_VERSION_ID = "-forceVersionId";
@@ -67,7 +67,7 @@ namespace RobloxClientTracker
         static bool FORCE_COMMIT = false;
 
         static int UPDATE_FREQUENCY = 5;
-        static bool VERBOSE_GIT_LOGS = false;
+        static bool VERBOSE_LOGS = false;
         static bool MANUAL_BUILD = false;
 
         static TrackMode TRACK_MODE = TrackMode.Client;
@@ -138,9 +138,8 @@ namespace RobloxClientTracker
             { "U", GRAY    },
         };
 
-        static readonly ProcessStartInfo gitExecute = new ProcessStartInfo
+        static readonly ProcessStartInfo cmdExecute = new ProcessStartInfo
         {
-            FileName = "git",
             CreateNoWindow = true,
             UseShellExecute = false,
             RedirectStandardError = true,
@@ -188,53 +187,59 @@ namespace RobloxClientTracker
             return dir;
         }
 
-        public static IEnumerable<string> git(params string[] args)
+        public static IEnumerable<string> cmd(string workDir, string name, params string[] args)
         {
-            Directory.SetCurrentDirectory(stageDir);
+            Directory.SetCurrentDirectory(workDir);
 
             string command = string.Join(" ", args);
-            Process git;
+            Process cmd;
 
-            lock (gitExecute)
+            lock (cmdExecute)
             {
-                gitExecute.Arguments = command;
-                git = Process.Start(gitExecute);
+                cmdExecute.FileName = name;
+                cmdExecute.Arguments = command;
+                cmd = Process.Start(cmdExecute);
             }
 
-            if (VERBOSE_GIT_LOGS)
-                print($"> git {command}");
+            if (VERBOSE_LOGS)
+                print($"> {name} {command}");
 
-            List<string> outLines = new List<string>();
+            var output = new List<string>();
 
             var processOutput = new Action<string, bool>((message, isError) =>
             {
                 if (message != null && message.Length > 0)
                 {
-                    lock (outLines)
+                    lock (output)
                     {
-                        if (VERBOSE_GIT_LOGS || isError)
+                        if (VERBOSE_LOGS || isError)
                         {
-                            log("[git] ", MAGENTA);
+                            log($"[{name}] ", MAGENTA);
                             print(message, isError ? RED : WHITE);
                         }
 
-                        outLines.Add(message);
+                        output.Add(message);
                     }
                 }
             });
 
-            git.ErrorDataReceived += new DataReceivedEventHandler
-                ((sender, evt) => processOutput(evt.Data, true));
+            if (name != "cargo")
+                cmd.ErrorDataReceived += new DataReceivedEventHandler
+                    ((sender, evt) => processOutput(evt.Data, true));
 
-            git.OutputDataReceived += new DataReceivedEventHandler
+            cmd.OutputDataReceived += new DataReceivedEventHandler
                 ((sender, evt) => processOutput(evt.Data, false));
-            
-            git.BeginOutputReadLine();
-            git.BeginErrorReadLine();
 
-            git.WaitForExit();
+            cmd.BeginOutputReadLine();
+            cmd.BeginErrorReadLine();
+            cmd.WaitForExit();
 
-            return outLines;
+            return output;
+        }
+
+        public static IEnumerable<string> git(params string[] args)
+        {
+            return cmd(stageDir, "git", args);
         }
 
         static List<string> getChangedFiles(string filter)
@@ -476,11 +481,9 @@ namespace RobloxClientTracker
             studio.EchoFeed += new MessageFeed((msg) => print(msg, YELLOW));
             studio.StatusFeed += new MessageFeed((msg) => print(msg, MAGENTA));
 
-            var dataMiners = AppDomain.CurrentDomain
-                .GetAssemblies()
+            var dataMiners = AppDomain.CurrentDomain.GetAssemblies()
                 .SelectMany(assembly => assembly.GetTypes())
-                .Where(type => !type.IsAbstract)
-                .Where(type => type.IsSubclassOf(DataMiner))
+                .Where(type => !type.IsAbstract && type.IsSubclassOf(DataMiner))
                 .Select(type => Activator.CreateInstance(type))
                 .Cast<DataMiner>();
 
@@ -635,7 +638,8 @@ namespace RobloxClientTracker
                         await RobloxApiDumpTool.ArgProcessor.Run(new Dictionary<string, string>()
                         {
                             { "-updatePages", pageDir },
-                            { "-version", versionId }
+                            { "-version", versionId },
+                            { "-full", "" },
                         });
 
                         Directory.SetCurrentDirectory(stageDir);
@@ -859,8 +863,8 @@ namespace RobloxClientTracker
             if (argMap.ContainsKey(ARG_FORCE_COMMIT))
                 FORCE_COMMIT = true;
 
-            if (argMap.ContainsKey(ARG_VERBOSE_GIT_LOGS))
-                VERBOSE_GIT_LOGS = true;
+            if (argMap.ContainsKey(ARG_VERBOSE_LOGS))
+                VERBOSE_LOGS = true;
 
             if (argMap.ContainsKey(ARG_MANUAL_BUILD))
                 MANUAL_BUILD = true;

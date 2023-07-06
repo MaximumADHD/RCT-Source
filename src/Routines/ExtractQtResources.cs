@@ -3,7 +3,7 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
 using System.IO.Compression;
-
+using System.Linq;
 using RobloxClientTracker.Properties;
 #pragma warning disable IDE1006 // Naming Styles
 
@@ -12,15 +12,6 @@ namespace RobloxClientTracker
     public class ExtractQtResources : DataMiner
     {
         public override ConsoleColor LogColor => ConsoleColor.Magenta;
-
-        private static readonly IReadOnlyDictionary<string, byte[]> luaFiles = new Dictionary<string, byte[]>
-        {
-            { "BinaryReader.lua",  Resources.BinaryReader_lua },
-            { "QtExtract.lua",     Resources.QtExtract_lua    },
-            { "PEParser.lua",      Resources.PEParser_lua     },
-            { "Deflate.lua",       Resources.Deflate_lua      },
-            { "Bit.lua",           Resources.Bit_lua          },
-        };
 
         private static string shortenPath(params string[] traversal)
         {
@@ -32,80 +23,69 @@ namespace RobloxClientTracker
             return path;
         }
 
-        private void deployLuaJit(string dir)
-        {
-            resetDirectory(dir);
-
-            using (var stream = new MemoryStream(Resources.LuaJIT_zip))
-            using (var luaJit = new ZipArchive(stream, ZipArchiveMode.Read))
-            {
-                foreach (ZipArchiveEntry entry in luaJit.Entries)
-                {
-                    string fullPath = Path.Combine(dir, entry.FullName);
-
-                    if (fullPath.EndsWith("/", Program.InvariantString))
-                    {
-                        Directory.CreateDirectory(fullPath);
-                        continue;
-                    }
-
-                    entry.ExtractToFile(fullPath);
-                }
-            }
-
-            foreach (string fileName in luaFiles.Keys)
-            {
-                byte[] luaFile = luaFiles[fileName];
-                string filePath = Path.Combine(dir, fileName);
-
-                File.WriteAllBytes(filePath, luaFile);
-            }
-        }
-
         public override void ExecuteRoutine()
         {
+            string qtExtract = createDirectory(trunk, "qtextract");
+            string gitBinding = Path.Combine(qtExtract, ".git");
+
+            if (!Directory.Exists(gitBinding))
+                cmd(trunk, "git", "clone https://github.com/axstin/qtextract.git");
+
+            // Check if rust needs to update.
+            print("Updating rust...");
+            cmd(qtExtract, "rustup", "update -q");
+
+            // Build qtextract.
+            print("Building qtextract...");
+            cmd(qtExtract, "cargo", "build -q");
+
+            // Get arguments ready.
             string extractDir = resetDirectory(stageDir, "QtResources");
-            string luaDir = shortenPath(trunk, "lua");
-
-            string luaJit = Path.Combine(luaDir, "luajit.cmd");
-            string qtExtract = Path.Combine(luaDir, "QtExtract.lua");
-
-            if (!File.Exists(luaJit) || !File.Exists(qtExtract))
-            {
-                print("Deploying LuaJIT...");
-                deployLuaJit(luaDir);
-            }
+            string outputDir = resetDirectory(studioDir, "qtextract");
 
             string rawStudioPath = shortenPath(studioPath);
             extractDir = shortenPath(extractDir);
-            
-            var extract = new ProcessStartInfo()
-            {
-                FileName = luaJit,
-                Arguments = $"{qtExtract} {rawStudioPath} --chunk 1 --output {extractDir}",
 
-                CreateNoWindow = true,
-                UseShellExecute = false
-            };
-
+            // Run it!
             print("Extracting Qt Resources...");
+            cmd(qtExtract, "cargo", $"-q run {rawStudioPath} --chunk 0 --output {outputDir}");
 
-            using (Process process = Process.Start(extract))
+            foreach (string folder in Directory.GetDirectories(outputDir))
             {
-                process.WaitForExit();
-                process.Close();
+                // First layer is an index.
+                var info = new DirectoryInfo(folder);
+
+                if (int.TryParse(info.Name, out int index))
+                {
+                    // Second layer is the name of this chunk.
+                    var rootDir = Directory
+                        .GetDirectories(folder)
+                        .First();
+
+                    foreach (var file in Directory.GetFiles(rootDir, "*.*", SearchOption.AllDirectories))
+                    {
+                        string localPath = file.Replace(rootDir, "");
+                        var split = localPath.Split('\\');
+
+                        if (split.Length == 2)
+                            // TEMPORARY HACK, probably should just be generalized?
+                            localPath = "\\RobloxStyle" + localPath;
+
+                        string reroute = extractDir + localPath;
+                        var fileInfo = new FileInfo(reroute);
+
+                        string dir = fileInfo.DirectoryName;
+                        createDirectory(dir);
+
+                        if (File.Exists(reroute))
+                            File.Delete(reroute);
+
+                        File.Move(file, reroute);
+                    }
+                }
             }
 
-            foreach (string file in Directory.GetFiles(extractDir, "*.xml", SearchOption.AllDirectories))
-            {
-                FileInfo info = new FileInfo(file);
-                string newPath = Path.Combine(stageDir, info.Name);
-
-                if (File.Exists(newPath))
-                    File.Delete(newPath);
-
-                File.Move(file, newPath);
-            }
+            Debugger.Break();
         }
     }
 }
