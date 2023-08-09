@@ -59,7 +59,7 @@ namespace RobloxClientTracker
 
         public override void ExecuteRoutine()
         {
-            string extraContent = Path.Combine(studioDir, "ExtraContent");
+            string extraContent = createDirectory(studioDir, "content");
 
             // HashSets ignores duplicate entries
             var flags = new HashSet<string>();
@@ -86,7 +86,6 @@ namespace RobloxClientTracker
             // Scan flags defined in the binary
 
             var binary = File.ReadAllBytes(studioPath);
-
             int knownFlagAddress = findSequence(binary, 0, Encoding.UTF8.GetBytes("DebugDisplayFPS"));
 
             if (knownFlagAddress == -1)
