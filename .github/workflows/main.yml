@@ -42,5 +42,5 @@ jobs:
         shell: bash
         
       - name:  Run Client Tracker
-        run:   RobloxClientTracker.exe -branch sitetest2.robloxlabs -parent sitetest1.robloxlabs
+        run:   RobloxClientTracker.exe -channel zintegration -parent zcanary
         shell: cmd
