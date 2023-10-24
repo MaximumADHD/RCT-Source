@@ -35,6 +35,7 @@ namespace RobloxClientTracker
         public byte[] Buffer { get; set; }
 
         public int Mask { get; set; }
+        public Dictionary<string, ShaderFFlagMask> FFlagMasks { get; set; }
 
         public string Id
         {

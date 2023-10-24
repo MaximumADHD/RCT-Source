@@ -21,6 +21,17 @@ namespace RobloxClientTracker
         }
     }
 
+    public struct ShaderFFlagMask
+    {
+        public int WhenDisabled;
+        public int WhenEnabled;
+
+        public override string ToString()
+        {
+            return $"[❌{WhenDisabled}][✔️{WhenEnabled}]";
+        }
+    }
+
     public class ShaderPack
     {
         public string Name { get; private set; }
@@ -52,10 +63,21 @@ namespace RobloxClientTracker
             using (BinaryReader reader = new BinaryReader(file))
             {
                 uint numNames = 0;
+                uint numFFlags = 0;
+
                 Header = reader.ReadString(4);
                 Version = reader.ReadUInt16();
 
-                NumGroups = reader.ReadUInt16();
+                if (Version >= 10)
+                {
+                    NumGroups = reader.ReadByte();
+                    numFFlags = reader.ReadByte();
+                }
+                else
+                {
+                    NumGroups = reader.ReadUInt16();
+                }
+
                 NumShaders = reader.ReadUInt16();
 
                 if (Version >= 9)
@@ -76,6 +98,7 @@ namespace RobloxClientTracker
 
                 // Read Names
                 var names = new ShaderDef[numNames];
+                var fflags = new string[numFFlags];
 
                 for (int i = 0; i < numNames; i++)
                 {
@@ -85,6 +108,9 @@ namespace RobloxClientTracker
                         Mask = reader.ReadUInt32(),
                     };
                 }
+
+                for (int i = 0; i < numFFlags; i++)
+                    fflags[i] = reader.ReadString(64);
 
                 for (int i = 0; i < NumShaders; i++)
                 {
@@ -121,7 +147,28 @@ namespace RobloxClientTracker
                         shader.Stub = reader.ReadBytes(skip);
                     }
 
+                    var flagMasks = new Dictionary<string, ShaderFFlagMask>();
                     shader.Name = name;
+
+                    if (Version > 9)
+                    {
+                        for (int j = 0; j < numFFlags; j++)
+                        {
+                            string flagName = fflags[j];
+
+                            // best guess: this enables certain bit-flags on the
+                            // shader when the specified FFlag is enabled/disabled?
+                            // without knowing what the bit-flags represent, it's hard to tell.
+
+                            flagMasks[flagName] = new ShaderFFlagMask
+                            {
+                                WhenEnabled = reader.ReadInt32(),
+                                WhenDisabled = reader.ReadInt32(),
+                            };
+                        }
+                    }
+
+                    shader.FFlagMasks = flagMasks;
                     ShadersImpl[i] = shader;
                 }
 
