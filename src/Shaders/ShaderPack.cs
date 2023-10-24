@@ -152,7 +152,8 @@ namespace RobloxClientTracker
 
                     if (Version > 9)
                     {
-                        for (int j = 0; j < numFFlags; j++)
+                        byte[] stub = reader.ReadBytes(32);
+                        /* for (int j = 0; j < numFFlags; j++)
                         {
                             string flagName = fflags[j];
 
@@ -165,7 +166,7 @@ namespace RobloxClientTracker
                                 WhenEnabled = reader.ReadInt32(),
                                 WhenDisabled = reader.ReadInt32(),
                             };
-                        }
+                        }*/
                     }
 
                     shader.FFlagMasks = flagMasks;
