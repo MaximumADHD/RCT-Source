@@ -6,6 +6,7 @@ using System.Diagnostics.Contracts;
 
 using RobloxFiles;
 using System.Diagnostics;
+using RobloxFiles.DataTypes;
 #pragma warning disable IDE1006 // Naming Styles
 
 namespace RobloxClientTracker
@@ -82,9 +83,15 @@ namespace RobloxClientTracker
                     }
                 }
 
-                var source = luaFile.Source;
+                // why are these properties separate again?
+                ProtectedString source = null;
 
-                if (source.IsCompiled)
+                if (luaFile is Script script)
+                    source = script.Source;
+                else if (luaFile is ModuleScript moduleScript)
+                    source = moduleScript.Source;
+                
+                if (source != null && source.IsCompiled)
                     extension += "c";
 
                 value = source;
