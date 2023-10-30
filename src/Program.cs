@@ -32,6 +32,7 @@ namespace RobloxClientTracker
 
         public static readonly Encoding UTF8 = new UTF8Encoding(false);
 
+        const string ARG_BRANCH = "-branch";
         const string ARG_PARENT = "-parent";
         const string ARG_CHANNEL = "-channel";
         const string ARG_TRACK_MODE = "-trackMode";
@@ -848,6 +849,9 @@ namespace RobloxClientTracker
             if (!string.IsNullOrEmpty(argKey))
                 argMap.Add(argKey, "");
 
+            if (argMap.ContainsKey(ARG_BRANCH))
+                branch = argMap[ARG_BRANCH];
+
             if (argMap.ContainsKey(ARG_CHANNEL))
                 channel = argMap[ARG_CHANNEL];
 
@@ -898,7 +902,7 @@ namespace RobloxClientTracker
             }
             #endregion
 
-            if (TRACK_MODE == TrackMode.Client)
+            if (TRACK_MODE == TrackMode.Client && !argMap.ContainsKey(ARG_BRANCH))
             {
                 switch (channel.Name)
                 {
