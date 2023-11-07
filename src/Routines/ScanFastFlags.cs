@@ -18,6 +18,9 @@ namespace RobloxClientTracker
     {
         public override ConsoleColor LogColor => ConsoleColor.Yellow;
 
+        private const string SHOW_EVENT = "StudioNoSplashScreen";
+        private const string START_EVENT = "ClientTrackerFlagScan";
+
         /// https://stackoverflow.com/a/39021296/11852173
         /// <summary>Looks for the next occurrence of a sequence in a byte array</summary>
         /// <param name="array">Array that will be scanned</param>
@@ -57,34 +60,10 @@ namespace RobloxClientTracker
             return -1;
         }
 
-        public override void ExecuteRoutine()
+        // Scans for FFlags by parsing the assembly instructions.
+        // !! Temporarily disabled because it's not future proof :(
+        private void ScanFlagsUsingInstructions(HashSet<string> flags)
         {
-            string extraContent = createDirectory(studioDir, "content");
-
-            // HashSets ignores duplicate entries
-            var flags = new HashSet<string>();
-            var timer = new Stopwatch();
-
-            print("Starting FastVariable scan...");
-
-            // Scan flags defined in Lua scripts
-
-            timer.Start();
-
-            foreach (var file in Directory.GetFiles(extraContent, "*.lua", SearchOption.AllDirectories))
-            {
-                string contents = File.ReadAllText(file);
-                var matches = Regex.Matches(contents, "game:(?:Get|Define)Fast(Flag|Int|String)\\(\\\"(\\w+)\\\"").Cast<Match>();
-
-                foreach (var match in matches)
-                {
-                    string flag = String.Format("F{0}{1}", match.Groups[1], match.Groups[2]);
-                    flags.Add($"[Lua] {flag}");
-                }
-            }
-
-            // Scan flags defined in the binary
-
             var binary = File.ReadAllBytes(studioPath);
             int knownFlagAddress = findSequence(binary, 0, Encoding.UTF8.GetBytes("DebugDisplayFPS"));
 
@@ -164,6 +143,7 @@ namespace RobloxClientTracker
             };
 
             position = 0;
+
             while (true)
             {
                 jmpInstAddr = findSequence(binary, position, new byte[] { 0xE9 });
@@ -198,27 +178,143 @@ namespace RobloxClientTracker
                         flagName += 'D';
                 }
 
-                flagName += flagType;
-
                 int stringIndex = targetLeaAddress;
+                flagName += flagType;
 
                 for (int i = targetLeaAddress; binary[i] != 0; i++)
                     flagName += Convert.ToChar(binary[i]);
 
                 flags.Add($"[C++] {flagName}");
-
                 position = jmpInstAddr + 1;
             }
+        }
+
+        private void ScanFlagsUsingExecutable(HashSet<string> flags)
+        {
+            string localAppData = Environment.GetEnvironmentVariable("LocalAppData");
+
+            string clientSettings = resetDirectory(localAppData, "Roblox", "ClientSettings");
+            string settingsPath = Path.Combine(clientSettings, "StudioAppSettings.json");
+
+            string studioSettings = createDirectory(studioDir, "ClientSettings");
+            string studioSettingsPath = Path.Combine(studioSettings, "ClientAppSettings.json");
+
+            File.WriteAllText(settingsPath, "");
+            File.WriteAllBytes(studioSettingsPath, Resources.ClientAppSettings_json);
+
+            using (var show = new SystemEvent(SHOW_EVENT))
+            using (var start = new SystemEvent(START_EVENT))
+            {
+                print("Starting FFlag scan...");
+
+                var startInfo = new ProcessStartInfo()
+                {
+                    FileName = studioPath,
+                    Arguments = $"-startEvent {start.Name} -showEvent {show.Name}"
+                };
+
+                using (Process update = Process.Start(startInfo))
+                {
+                    print("\tWaiting for signal from studio...");
+                    start.WaitOne();
+
+                    int timeOut = 0;
+                    const int numTries = 32;
+
+                    print("\tWaiting for StudioAppSettings.json to be written...");
+                    FileInfo info = new FileInfo(settingsPath);
+
+                    while (timeOut < numTries)
+                    {
+                        info.Refresh();
+
+                        if (info.Length > 0)
+                        {
+                            if (!update.HasExited)
+                                update.Kill();
+
+                            break;
+                        }
+
+                        print($"\t\t({++timeOut}/{numTries} tries until giving up...)");
+
+                        var delay = Task.Delay(30);
+                        delay.Wait();
+                    }
+
+                    if (info.Length == 0)
+                    {
+                        print("FAST FLAG EXTRACTION FAILED!", ConsoleColor.Red);
+
+                        update.Close();
+                        update.Kill();
+
+                        return;
+                    }
+
+                    var file = File.ReadAllText(settingsPath);
+
+                    using (var jsonText = new StringReader(file))
+                    using (var reader = new JsonTextReader(jsonText))
+                    {
+                        var flagData = JObject.Load(reader);
+
+                        foreach (var pair in flagData)
+                        {
+                            string flagName = pair.Key;
+                            flags.Add($"[C++] {flagName}");
+                        }
+                    }
+
+                    print("Flag Scan completed!");
+                    update.Close();
+                }
+            }
+        }
+
+        public override void ExecuteRoutine()
+        {
+            string extraContent = createDirectory(studioDir, "content");
+
+            // HashSets ignores duplicate entries
+            var flags = new HashSet<string>();
+            var timer = new Stopwatch();
+
+            print("Starting FastVariable scan...");
+
+            // Scan flags defined in Lua scripts
+            timer.Start();
+            print("Scanning Lua flags...");
+
+            foreach (var file in Directory.GetFiles(extraContent, "*.lua", SearchOption.AllDirectories))
+            {
+                string contents = File.ReadAllText(file);
+                var matches = Regex.Matches(contents, "game:(?:Get|Define)Fast(Flag|Int|String)\\(\\\"(\\w+)\\\"").Cast<Match>();
+
+                foreach (var match in matches)
+                {
+                    string flag = string.Format("F{0}{1}", match.Groups[1], match.Groups[2]);
+                    flags.Add($"[Lua] {flag}");
+                }
+            }
+
+            // Scan flags defined in C++
+            // !! FIXME: Find some way to switch between these two techniques and fallback to the executable scan as a fail-safe.
+            print("Scanning C++ flags...");
+
+            #if false
+                ScanFlagsUsingInstructions(flags);
+            #else
+                ScanFlagsUsingExecutable(flags);
+            #endif
 
             timer.Stop();
-
             print($"FastVariable scan completed in {timer.Elapsed} with {flags.Count} variables");
 
             var sortedFlags = flags.OrderBy(x => x.Substring(6)).ToList();
-
             string flagsPath = Path.Combine(stageDir, "FVariables.txt");
-            string result = string.Join("\r\n", sortedFlags);
 
+            string result = string.Join("\r\n", sortedFlags);
             writeFile(flagsPath, result);
         }
     }
