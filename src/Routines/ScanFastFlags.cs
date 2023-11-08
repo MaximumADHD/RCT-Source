@@ -80,8 +80,6 @@ namespace RobloxClientTracker
             // jmp <offset>           | E9 ?? ?? ?? ??       | Jumps to the subroutine that registers it as a flag
 
             int position = 0;
-            int index = 0;
-
             int knownFlagLoadAddress = 0;
             int leaOffset = 0;
 
@@ -90,7 +88,7 @@ namespace RobloxClientTracker
                 // Look for the 'lea rcx' instruction
                 int leaInstAddr = findSequence(binary, position, new byte[] { 0x48, 0x8D, 0x0D });
 
-                if (index == -1)
+                if (leaInstAddr == -1)
                     throw new RoutineFailedException("Could not find address of instruction that loads known flag");
 
                 // Next instruction should be a 'jmp'
