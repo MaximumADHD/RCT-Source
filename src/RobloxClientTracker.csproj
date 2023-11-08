@@ -68,6 +68,7 @@
     <Compile Include="DataMiners\DataMiner.cs" />
     <Compile Include="DataMiners\MultiTaskMiner.cs" />
     <Compile Include="DataMiners\RobloxFileMiner.cs" />
+    <Compile Include="Exceptions\RoutineFailedException.cs" />
     <Compile Include="Properties\Resources.Designer.cs">
       <AutoGen>True</AutoGen>
       <DesignTime>True</DesignTime>
