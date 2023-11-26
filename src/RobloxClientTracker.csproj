@@ -70,6 +70,7 @@
     <Compile Include="DataMiners\RobloxFileMiner.cs" />
     <Compile Include="Luau\LuauByteCode.cs" />
     <Compile Include="Luau\LuauConst.cs" />
+    <Compile Include="Luau\LuauDisassembly.cs" />
     <Compile Include="Luau\LuauProto.cs" />
     <Compile Include="Exceptions\RoutineFailedException.cs" />
     <Compile Include="Properties\Resources.Designer.cs">
@@ -98,7 +99,6 @@
     <Compile Include="Utility\ClientTrackerState.cs" />
     <Compile Include="Utility\Extensions.cs" />
     <Compile Include="Utility\FileLogConfig.cs" />
-    <Compile Include="Luau\LuauDisassembler.cs" />
     <Compile Include="Utility\ModelHasher.cs" />
     <Compile Include="Shaders\ShaderFile.cs" />
     <Compile Include="Shaders\ShaderPack.cs" />
