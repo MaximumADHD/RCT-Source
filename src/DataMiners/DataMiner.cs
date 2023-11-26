@@ -74,5 +74,14 @@ namespace RobloxClientTracker
             print($"Writing file: {localPath(path)}", config.Color);
             writeFile(path, contents);
         }
+
+        protected void writeFile(string path, byte[] contents, FileLogConfig config)
+        {
+            for (int i = 0; i < config.Stack; i++)
+                Console.Write('\t');
+
+            print($"Writing file: {localPath(path)}", config.Color);
+            File.WriteAllBytes(path, contents);
+        }
     }
 }

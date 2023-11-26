@@ -7,6 +7,7 @@ using System.Diagnostics.Contracts;
 using RobloxFiles;
 using System.Diagnostics;
 using RobloxFiles.DataTypes;
+using RobloxClientTracker.Luau;
 #pragma warning disable IDE1006 // Naming Styles
 
 namespace RobloxClientTracker
@@ -60,6 +61,7 @@ namespace RobloxClientTracker
 
         public static bool PullInstanceData(Instance inst, ref string value, ref string extension)
         {
+            bool canSanitize = true;
             Contract.Requires(inst != null);
 
             if (inst is LuaSourceContainer luaFile)
@@ -92,7 +94,10 @@ namespace RobloxClientTracker
                     source = moduleScript.Source;
                 
                 if (source != null && source.IsCompiled)
+                {
                     extension += "c";
+                    canSanitize = false;
+                }
 
                 value = source;
             }
@@ -112,7 +117,9 @@ namespace RobloxClientTracker
                 extension = ".csv";
             }
 
-            value = sanitizeString(value);
+            if (canSanitize)
+                value = sanitizeString(value);
+
             return (value.Length > 0);
         }
 
@@ -131,6 +138,19 @@ namespace RobloxClientTracker
             }
 
             list.Add(inst, parent);
+        }
+
+        private void writeScript(string writePath, ProtectedString source)
+        {
+            byte[] buffer = source.RawBuffer;
+            writeFile(writePath, buffer, LogRbxm);
+
+            if (source.IsCompiled)
+            {
+                var disassembler = new LuauDisassembler(buffer);
+                string disassembly = disassembler.BuildDisassembly();
+                writeFile(writePath + ".s", disassembly, LogRbxm);
+            }
         }
 
         private void unpackImpl(Instance inst, string parentDir, Instance expectParent)
@@ -238,18 +258,23 @@ namespace RobloxClientTracker
             else if (Directory.Exists(instDir))
                 Directory.Delete(instDir);
 
-            if (PullInstanceData(inst, ref value, ref extension))
+            if (PullInstanceData(inst, ref value, ref extension) && inst is LuaSourceContainer lua)
             {
-                if (inst is LuaSourceContainer lua && Directory.Exists(instDir))
-                {
-                    string filePath = Path.Combine(instDir, "init" + extension);
-                    writeFile(filePath, value, LogRbxm);
-                }
+                ProtectedString bin = null;
+
+                if (lua is Script script)
+                    bin = script.Source;
+                else if (lua is ModuleScript moduleScript)
+                    bin = moduleScript.Source;
+
+                string filePath;
+
+                if (Directory.Exists(instDir))
+                    filePath = Path.Combine(instDir, "init" + extension);
                 else
-                {
-                    string filePath = instDir + extension;
-                    writeFile(filePath, value, LogRbxm);
-                }
+                    filePath = instDir + extension;
+
+                writeScript(filePath, bin);
             }
         }
 

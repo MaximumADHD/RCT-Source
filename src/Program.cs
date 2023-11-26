@@ -665,7 +665,7 @@ namespace RobloxClientTracker
                         print("Creating commits...", YELLOW);
 
                         bool didStagePackages = stageCommit($"{versionId} (Packages)", "*/_Index/*");
-                        bool didStageScripts = stageCommit($"{versionId} (Scripts)", "*.lua");
+                        bool didStageScripts = stageCommit($"{versionId} (Scripts)", "*.lua|*.luac|*.luac.s");
                         bool didStageCore = stageCommit(versionId);
 
                         if (didStagePackages || didStageScripts || didStageCore)
