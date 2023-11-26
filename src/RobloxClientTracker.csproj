@@ -71,6 +71,7 @@
     <Compile Include="Luau\LuauByteCode.cs" />
     <Compile Include="Luau\LuauConst.cs" />
     <Compile Include="Luau\LuauProto.cs" />
+    <Compile Include="Exceptions\RoutineFailedException.cs" />
     <Compile Include="Properties\Resources.Designer.cs">
       <AutoGen>True</AutoGen>
       <DesignTime>True</DesignTime>

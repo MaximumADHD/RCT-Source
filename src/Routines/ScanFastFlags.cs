@@ -10,6 +10,7 @@ using System.Threading.Tasks;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 using RobloxClientTracker.Properties;
+using RobloxClientTracker.Exceptions;
 using RobloxStudioModManager;
 
 namespace RobloxClientTracker
@@ -68,22 +69,17 @@ namespace RobloxClientTracker
             int knownFlagAddress = findSequence(binary, 0, Encoding.UTF8.GetBytes("DebugDisplayFPS"));
 
             if (knownFlagAddress == -1)
-            {
-                print("FAST FLAG EXTRACTION FAILED! (Could not find address of known flag)", ConsoleColor.Red);
-                return;
-            }
+                throw new RoutineFailedException("Could not find address of known flag");
 
             // https://files.pizzaboxer.xyz/i/x64dbg_PavTJp2sLp.png
             // Note that for instructions that handle addresses (e.g. lea and jmp), operand is
             // an offset to a memory address relative to the address of the instruction's end
             // mov r8d, <value>       | 41 B8 ?? ?? ?? ??    | Determines if it's a dynamic flag
-            // lea rdx, ds:[<offset>] | 48 8D 15 ?? ?? ?? ?? | Ignore, we don't really care about this, might be for the value?
+            // lea rdx, ds:[<offset>] | 48 8D 15 ?? ?? ?? ?? | Loads the default flag value
             // lea rcx, ds:[<offset>] | 48 8D 0D ?? ?? ?? ?? | Loads the string of the flag name into memory 
             // jmp <offset>           | E9 ?? ?? ?? ??       | Jumps to the subroutine that registers it as a flag
 
             int position = 0;
-            int index = 0;
-
             int knownFlagLoadAddress = 0;
             int leaOffset = 0;
 
@@ -92,11 +88,8 @@ namespace RobloxClientTracker
                 // Look for the 'lea rcx' instruction
                 int leaInstAddr = findSequence(binary, position, new byte[] { 0x48, 0x8D, 0x0D });
 
-                if (index == -1)
-                {
-                    print("FAST FLAG EXTRACTION FAILED! (Could not find address of instruction that loads known flag)", ConsoleColor.Red);
-                    return;
-                }
+                if (leaInstAddr == -1)
+                    throw new RoutineFailedException("Could not find address of instruction that loads known flag");
 
                 // Next instruction should be a 'jmp'
                 if (binary[leaInstAddr + 7] != 0xE9)
@@ -110,7 +103,7 @@ namespace RobloxClientTracker
 
                 // Weird oddity - the target address specified by the lea instruction may
                 // itself be offset up to 0x0F00 bytes prior, with an alignment of 0x0100
-                for (int i = 0; i > -0x0F00; i -= 0x0100)
+                for (int i = 0; i > -0xFF00; i -= 0x0100)
                 {
                     if (leaTargetAddr + i == knownFlagAddress)
                     {
@@ -178,7 +171,6 @@ namespace RobloxClientTracker
                         flagName += 'D';
                 }
 
-                int stringIndex = targetLeaAddress;
                 flagName += flagType;
 
                 for (int i = targetLeaAddress; binary[i] != 0; i++)
@@ -260,10 +252,7 @@ namespace RobloxClientTracker
                         var flagData = JObject.Load(reader);
 
                         foreach (var pair in flagData)
-                        {
-                            string flagName = pair.Key;
-                            flags.Add($"[C++] {flagName}");
-                        }
+                            flags.Add($"[C++] {pair.Key}");
                     }
 
                     print("Flag Scan completed!");
@@ -292,21 +281,23 @@ namespace RobloxClientTracker
                 var matches = Regex.Matches(contents, "game:(?:Get|Define)Fast(Flag|Int|String)\\(\\\"(\\w+)\\\"").Cast<Match>();
 
                 foreach (var match in matches)
-                {
-                    string flag = string.Format("F{0}{1}", match.Groups[1], match.Groups[2]);
-                    flags.Add($"[Lua] {flag}");
-                }
+                    flags.Add(string.Format("[Lua] F{0}{1}", match.Groups[1], match.Groups[2]));
             }
 
             // Scan flags defined in C++
             // !! FIXME: Find some way to switch between these two techniques and fallback to the executable scan as a fail-safe.
             print("Scanning C++ flags...");
 
-            #if false
+            try
+            {
                 ScanFlagsUsingInstructions(flags);
-            #else
+            }
+            catch (Exception ex)
+            {
+                print($"Failed to scan with static analysis! ({ex.GetType().FullName}: {ex.Message})", ConsoleColor.Yellow);
+                print("Attempting to scan by dumping StudioAppSettings...", ConsoleColor.Yellow);
                 ScanFlagsUsingExecutable(flags);
-            #endif
+            }
 
             timer.Stop();
             print($"FastVariable scan completed in {timer.Elapsed} with {flags.Count} variables");
