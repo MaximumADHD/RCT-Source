@@ -178,6 +178,7 @@ namespace RobloxClientTracker
         public static string createDirectory(params string[] traversal)
         {
             string dir = Path.Combine(traversal);
+            dir = dir.Replace("/", "\\");
 
             if (!dir.StartsWith(@"\\?\"))
                 dir = @"\\?\" + dir;
@@ -792,7 +793,7 @@ namespace RobloxClientTracker
                         if (lower == "true" || lower == "false")
                             value = lower;
                         else if (int.TryParse(value, out int testInt))
-                            value = testInt;
+                            value = testInt.ToString();
                         else
                             value = '"' + value.Replace("\\", "\\\\").Replace("\"", "\\\"") + '"';
 

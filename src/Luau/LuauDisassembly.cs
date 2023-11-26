@@ -13,7 +13,7 @@ namespace RobloxClientTracker.Luau
         public byte Register;
     }
 
-    internal class LuauDisassembler
+    public class LuauDisassembly
     {
         public readonly string[] Strings;
         public readonly int MainId;
@@ -21,7 +21,7 @@ namespace RobloxClientTracker.Luau
         public readonly LuauProto[] Protos;
         public LuauProto Main => Protos[MainId];
 
-        public LuauDisassembler(byte[] buffer)
+        public LuauDisassembly(byte[] buffer)
         {
             var stream = new MemoryStream(buffer);
             var reader = new BinaryReader(stream);

@@ -250,7 +250,7 @@ namespace RobloxClientTracker.Luau
                         }
                         case LuauOpcode.SETLIST:
                         {
-                            line += $"R{A()} R{B()} {C() - 1} [{AUX}]";
+                            line += $"R{A()} R{B()} {(int)C() - 1} [{AUX}]";
                             code++; // AUX
                             break;
                         }
@@ -274,7 +274,7 @@ namespace RobloxClientTracker.Luau
                         }
                         case LuauOpcode.GETVARARGS:
                         {
-                            line += $"R{A()} {B() - 1}";
+                            line += $"R{A()} {(int)B() - 1}";
                             break;
                         }
                         case LuauOpcode.DUPTABLE:
