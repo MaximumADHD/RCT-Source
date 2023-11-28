@@ -292,60 +292,17 @@ namespace RobloxClientTracker
             return (behind > 0);
         }
 
-        static bool stageCommit(string label, string filter = ".")
+        static bool stageCommit(string label, params string[] filters)
         {
             print($"\t[{label}] Checking in files...", YELLOW);
-            git($"add {filter}");
 
-            // Verify this update is worth committing.
-            var files = getChangedFiles(filter);
+            foreach (string filter in filters)
+                git($"add {filter}");
 
-            int updateCount = 0;
-            int boringCount = 0;
+            print($"[{label}]\tCommitting...", CYAN);
+            git($"commit -m \"{label}\"");
 
-            foreach (string file in files)
-            {
-                try
-                {
-                    string filePath = stageDir + '\\' + file;
-                    FileInfo fileInfo = new FileInfo(filePath);
-
-                    if (branch != "roblox")
-                    {
-                        if (boringFiles.Contains(fileInfo.Name) || fileInfo.Extension.Contains("rbx"))
-                        {
-                            boringCount++;
-                            continue;
-                        }
-                    }
-
-                    updateCount++;
-                }
-                catch
-                {
-                    // Illegal characters? No clue what to make of this.
-                }
-            }
-
-            if (updateCount > 0 || FORCE_COMMIT)
-            {
-                print($"[{label}]\tCommitting...", CYAN);
-                git($"commit -m \"{label}\"");
-
-                return true;
-            }
-            else
-            {
-                string skipMsg;
-
-                if (boringCount > 0)
-                    skipMsg = "This update was deemed to be boring";
-                else
-                    skipMsg = "No changes were detected";
-
-                print($"\t[{label}] {skipMsg}, skipping commit!", RED);
-                return false;
-            }
+            return true;
         }
 
         public static void cloneRepo(string repository, string stageDir)
@@ -666,7 +623,7 @@ namespace RobloxClientTracker
                         print("Creating commits...", YELLOW);
 
                         bool didStagePackages = stageCommit($"{versionId} (Packages)", "*/_Index/*");
-                        bool didStageScripts = stageCommit($"{versionId} (Scripts)", "*.lua|*.luac|*.luac.s");
+                        bool didStageScripts = stageCommit($"{versionId} (Scripts)", "*.lua", "*.luac", "*.luac.s");
                         bool didStageCore = stageCommit(versionId);
 
                         if (didStagePackages || didStageScripts || didStageCore)
