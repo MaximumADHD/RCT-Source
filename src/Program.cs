@@ -341,23 +341,23 @@ namespace RobloxClientTracker
                 : stageDir;
 
             string gitBinding = Path.Combine(localStageDir, ".git");
+            var settings = Settings.Default;
+            var init = false;
 
             if (!Directory.Exists(gitBinding))
             {
-                var settings = Settings.Default;
                 print($"Assembling {repository} stage @ {localStageDir}...", MAGENTA);
                 cloneRepo(repository, localStageDir);
-                
-                string name = settings.BotName;
-                git("config", "--local", "user.name", $"\"{name}\"");
-
-                string email = settings.BotEmail;
-                git("config", "--local", "user.email", email);
-
-                return true;
+                init = true;
             }
 
-            return false;
+            string name = settings.BotName;
+            git("config", "--local", "user.name", $"\"{name}\"");
+
+            string email = settings.BotEmail;
+            git("config", "--local", "user.email", email);
+
+            return init;
         }
 
         static async Task startRoutineLoop(Func<Task> routine)
