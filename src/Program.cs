@@ -244,11 +244,9 @@ namespace RobloxClientTracker
             return cmd(stageDir, "git", args);
         }
 
-        static List<string> getChangedFiles(string filter)
+        static bool reportChangedFiles(string filter = "*")
         {
             var query = git("status", "-s");
-            var result = new List<string>();
-
             string pattern = filter.Replace("*", ".*");
 
             foreach (string line in query)
@@ -272,10 +270,9 @@ namespace RobloxClientTracker
                 }
 
                 print($" {file}", WHITE);
-                result.Add(file);
             }
 
-            return result;
+            return query.Any();
         }
 
         static bool isRemoteBehind(string branch, string parent)
@@ -299,8 +296,11 @@ namespace RobloxClientTracker
             foreach (string filter in filters)
                 git($"add {filter}");
 
-            print($"[{label}]\tCommitting...", CYAN);
-            git($"commit -m \"{label}\"");
+            if (reportChangedFiles())
+            {
+                print($"[{label}]\tCommitting...", CYAN);
+                git($"commit -m \"{label}\"");
+            }
 
             return true;
         }
@@ -624,7 +624,7 @@ namespace RobloxClientTracker
 
                         bool didStagePackages = stageCommit($"{versionId} (Packages)", "*/_Index/*");
                         bool didStageScripts = stageCommit($"{versionId} (Scripts)", "*.lua", "*.luac", "*.luac.s");
-                        bool didStageCore = stageCommit(versionId);
+                        bool didStageCore = stageCommit(versionId, "*.*");
 
                         if (didStagePackages || didStageScripts || didStageCore)
                         {
