@@ -140,8 +140,9 @@ namespace RobloxClientTracker
             {
                 // there's a chance that we may find several offsets that appear to be valid
                 // so, we check against another known flag to find which one is the correct one
+                // yes about 70% of this code is repeated from above i had to fix this at 1am
 
-                Console.WriteLine("Finding correct offset...");
+                Console.WriteLine("Determining correct offset...");
 
                 int address = findSequence(binary, 0, Encoding.UTF8.GetBytes("DebugGraphicsPreferVulkan"));
 
@@ -172,7 +173,7 @@ namespace RobloxClientTracker
 
                         if (leaTargetAddr + offset == address)
                         {
-                            Console.WriteLine($"Determined {NegativeToString(offset)} as the valid offset");
+                            Console.WriteLine($"Determined {NegativeToString(offset)} as the correct offset");
                             leaOffset = offset;
                             knownFlagLoadAddress = leaInstAddr;
                             break;
@@ -183,7 +184,7 @@ namespace RobloxClientTracker
                 }
 
                 if (leaOffset == 0)
-                    throw new RoutineFailedException("Could not validate offset");
+                    throw new RoutineFailedException("Could not determine correct offset");
             }
 
             // After the lea instruction comes a jmp instruction
@@ -244,7 +245,13 @@ namespace RobloxClientTracker
                 flagName += flagType;
 
                 for (int i = targetLeaAddress; binary[i] != 0; i++)
+                {
+                    // ascii control characters - if we encounter these, something has gone seriously wrong
+                    if (binary[i] < 0x20)
+                        throw new RoutineFailedException("Encountered invalid data");
+
                     flagName += Convert.ToChar(binary[i]);
+                }
 
                 flags.Add($"[C++] {flagName}");
                 position = jmpInstAddr + 1;
