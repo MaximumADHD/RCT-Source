@@ -61,6 +61,14 @@ namespace RobloxClientTracker
             return -1;
         }
 
+        private static string NegativeToString(int value)
+        {
+            value = ~value;
+            value += 1;
+
+            return $"-0x{value:X2}";
+        }
+
         // Scans for FFlags by parsing the assembly instructions.
         // !! Temporarily disabled because it's not future proof :(
         private void ScanFlagsUsingInstructions(HashSet<string> flags)
@@ -83,13 +91,15 @@ namespace RobloxClientTracker
             int knownFlagLoadAddress = 0;
             int leaOffset = 0;
 
-            while (knownFlagLoadAddress == 0)
+            var possibleOffsets = new HashSet<int>();
+
+            while (position < binary.Length)
             {
                 // Look for the 'lea rcx' instruction
                 int leaInstAddr = findSequence(binary, position, new byte[] { 0x48, 0x8D, 0x0D });
 
                 if (leaInstAddr == -1)
-                    throw new RoutineFailedException("Could not find address of instruction that loads known flag");
+                    break;
 
                 // Next instruction should be a 'jmp'
                 if (binary[leaInstAddr + 7] != 0xE9)
@@ -107,13 +117,73 @@ namespace RobloxClientTracker
                 {
                     if (leaTargetAddr + i == knownFlagAddress)
                     {
-                        leaOffset = i;
+                        Console.WriteLine($"Got possible offset for {NegativeToString(i)}");
+                        possibleOffsets.Add(i);
                         knownFlagLoadAddress = leaInstAddr;
                         break;
                     }
                 }
 
                 position = leaInstAddr + 3;
+            }
+
+            Console.WriteLine("Finished scanning binary");
+            
+            if (!possibleOffsets.Any())
+                throw new RoutineFailedException("Could not find address of instruction that loads known flag");
+
+            if (possibleOffsets.Count() == 1)
+            {
+                leaOffset = possibleOffsets.First();
+            }
+            else
+            {
+                // there's a chance that we may find several offsets that appear to be valid
+                // so, we check against another known flag to find which one is the correct one
+
+                Console.WriteLine("Finding correct offset...");
+
+                int address = findSequence(binary, 0, Encoding.UTF8.GetBytes("DebugGraphicsPreferVulkan"));
+
+                if (address == -1)
+                    throw new RoutineFailedException("Could not find address of known flag");
+
+                foreach (int offset in possibleOffsets)
+                {
+                    position = 0;
+
+                    while (position < binary.Length)
+                    {
+                        // Look for the 'lea rcx' instruction
+                        int leaInstAddr = findSequence(binary, position, new byte[] { 0x48, 0x8D, 0x0D });
+
+                        if (leaInstAddr == -1)
+                            break;
+
+                        // Next instruction should be a 'jmp'
+                        if (binary[leaInstAddr + 7] != 0xE9)
+                        {
+                            position = leaInstAddr + 3;
+                            continue;
+                        }
+
+                        int leaInstOperand = BitConverter.ToInt32(binary, leaInstAddr + 3);
+                        int leaTargetAddr = leaInstAddr + 7 + leaInstOperand;
+
+                        if (leaTargetAddr + offset == address)
+                        {
+                            Console.WriteLine($"Determined {NegativeToString(offset)} as the valid offset");
+                            leaOffset = offset;
+                            knownFlagLoadAddress = leaInstAddr;
+                            break;
+                        }
+
+                        position = leaInstAddr + 3;
+                    }
+                }
+
+                if (leaOffset == 0)
+                    throw new RoutineFailedException("Could not validate offset");
             }
 
             // After the lea instruction comes a jmp instruction
@@ -288,16 +358,16 @@ namespace RobloxClientTracker
             // !! FIXME: Find some way to switch between these two techniques and fallback to the executable scan as a fail-safe.
             print("Scanning C++ flags...");
 
-            /*try
+            try
             {
                 ScanFlagsUsingInstructions(flags);
             }
             catch (Exception ex)
             {
                 print($"Failed to scan with static analysis! ({ex.GetType().FullName}: {ex.Message})", ConsoleColor.Yellow);
-                print("Attempting to scan by dumping StudioAppSettings...", ConsoleColor.Yellow);*/
+                print("Attempting to scan by dumping StudioAppSettings...", ConsoleColor.Yellow);
                 ScanFlagsUsingExecutable(flags);
-            //}
+            }
 
             timer.Stop();
             print($"FastVariable scan completed in {timer.Elapsed} with {flags.Count} variables");
