@@ -346,11 +346,18 @@ namespace RobloxClientTracker.Luau
         // B: source register (for VAL/REF) or upvalue index (for UPVAL/UPREF)
         CAPTURE,
 
+        // SUBRK, DIVRK: compute arithmetic operation between the constant and a source register and put the result into target register
+        // A: target register
+        // B: source register
+        // C: constant table index (0..255); must refer to a number
+        SUBRK,
+        DIVRK,
+
         // FASTCALL1: perform a fast call of a built-in function using 1 register argument
         // A: builtin function id (see LuauBuiltinFunction)
         // B: source argument register
         // C: jump offset to get to following CALL
-        FASTCALL1 = 73,
+        FASTCALL1,
 
         // FASTCALL2: perform a fast call of a built-in function using 2 register arguments
         // A: builtin function id (see LuauBuiltinFunction)

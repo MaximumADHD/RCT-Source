@@ -21,6 +21,7 @@ namespace RobloxClientTracker.Luau
         public byte LineGapLog2;
         public byte[] LineInfo;
 
+        public LuauDisassembly Parent;
         public LuauLocVar[] LocVars;
         public LuauProto[] Children;
         public LuauConst[] Consts;
@@ -184,7 +185,9 @@ namespace RobloxClientTracker.Luau
                         case LuauOpcode.DIVK:
                         case LuauOpcode.POWK:
                         case LuauOpcode.MODK:
+                        case LuauOpcode.DIVRK:
                         case LuauOpcode.IDIVK:
+                        case LuauOpcode.SUBRK:
                         {
                             line += $"R{A()} R{B()} {CONST(C)}";
                             break;
