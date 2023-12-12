@@ -8,7 +8,7 @@ using RobloxFiles;
 using System.Diagnostics;
 using RobloxFiles.DataTypes;
 using RobloxClientTracker.Luau;
-#pragma warning disable IDE1006 // Naming Styles
+using System.Text;
 
 namespace RobloxClientTracker
 {
@@ -147,9 +147,32 @@ namespace RobloxClientTracker
 
             if (source.IsCompiled)
             {
+                var builder = new StringBuilder();
                 var disassembler = new LuauDisassembly(buffer);
+
                 string disassembly = disassembler.BuildDisassembly();
                 writeFile(writePath + ".s", disassembly, LogRbxm);
+
+                using (var writer = new StringWriter(builder))
+                using (var stream = new MemoryStream(buffer))
+                {
+                    var decompiler = new Unluau.Decompiler(stream, new Unluau.DecompilerOptions()
+                    {
+                        Output = new Unluau.Output(writer),
+                        Encoding = Unluau.OpCodeEncoding.Studio,
+                    });
+
+                    try
+                    {
+                        decompiler.Decompile();
+                        writeFile(writePath.Replace("luac", "unluau.lua"), builder.ToString());
+                        Debugger.Break();
+                    }
+                    catch (Exception)
+                    {
+                        // ignore for now
+                    }
+                }
             }
         }
 

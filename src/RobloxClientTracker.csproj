@@ -137,6 +137,10 @@
       <Project>{fad2621f-b280-4d6d-a260-f410c5b06e0c}</Project>
       <Name>RobloxStudioModManager</Name>
     </ProjectReference>
+    <ProjectReference Include="..\..\unluau\src\Unluau\UnluauFramework.csproj">
+      <Project>{78978339-059f-4e41-abd4-b904507b4684}</Project>
+      <Name>UnluauFramework</Name>
+    </ProjectReference>
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
   <PropertyGroup>
