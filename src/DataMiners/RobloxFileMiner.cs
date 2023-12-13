@@ -153,6 +153,7 @@ namespace RobloxClientTracker
                 string disassembly = disassembler.BuildDisassembly();
                 writeFile(writePath + ".s", disassembly, LogRbxm);
 
+                #if !DEBUG
                 using (var writer = new StringWriter(builder))
                 using (var stream = new MemoryStream(buffer))
                 {
@@ -166,13 +167,13 @@ namespace RobloxClientTracker
                     {
                         decompiler.Decompile();
                         writeFile(writePath.Replace("luac", "unluau.lua"), builder.ToString());
-                        Debugger.Break();
                     }
                     catch (Exception)
                     {
                         // ignore for now
                     }
                 }
+                #endif
             }
         }
 
