@@ -61,15 +61,47 @@ namespace RobloxClientTracker
             return -1;
         }
 
+        private static readonly List<byte[]> opcodes = new List<byte[]>
+        {
+            new byte[] { 0xE9 },
+            new byte[] { 0x48, 0x8D, 0x0D }
+        };
+
+        private static int ResolveInstTargetAddr(byte[] binary, int pos, int dataOffset = 0)
+        {
+            int len = 0;
+
+            foreach (var opcode in opcodes)
+            {
+                if (findSequence(binary, pos, opcode) == pos)
+                {
+                    len = opcode.Length;
+                    break;
+                }
+            }
+
+            if (len == 0)
+                return -1;
+
+            return pos + len + 4 + BitConverter.ToInt32(binary, pos + len) + dataOffset;
+        }
+
         // Scans for FFlags by parsing the assembly instructions.
-        // !! Temporarily disabled because it's not future proof :(
         private void ScanFlagsUsingInstructions(HashSet<string> flags)
         {
             var binary = File.ReadAllBytes(studioPath);
-            int knownFlagAddress = findSequence(binary, 0, Encoding.UTF8.GetBytes("DebugDisplayFPS"));
 
-            if (knownFlagAddress == -1)
-                throw new RoutineFailedException("Could not find address of known flag");
+            List<int> knownAddresses = new List<int>
+            {
+                findSequence(binary, 0, Encoding.UTF8.GetBytes("DebugDisplayFPS")),
+                findSequence(binary, 0, Encoding.UTF8.GetBytes("DebugGraphicsPreferVulkan")),
+                findSequence(binary, 0, Encoding.UTF8.GetBytes("DebugGraphicsPreferD3D11"))
+            };
+
+            knownAddresses = knownAddresses.Where(x => x != -1).ToList();
+
+            if (knownAddresses.Count < 2)
+                throw new RoutineFailedException("Could not find address(es) of known flag");
 
             // https://files.pizzaboxer.xyz/i/x64dbg_PavTJp2sLp.png
             // Note that for instructions that handle addresses (e.g. lea and jmp), operand is
@@ -80,51 +112,65 @@ namespace RobloxClientTracker
             // jmp <offset>           | E9 ?? ?? ?? ??       | Jumps to the subroutine that registers it as a flag
 
             int position = 0;
-            int knownFlagLoadAddress = 0;
-            int leaOffset = 0;
+            var possibleOffsets = new Dictionary<int, int>();
+            int knownLeaInstAddr = 0;
 
-            while (knownFlagLoadAddress == 0)
+            while (position < binary.Length)
             {
                 // Look for the 'lea rcx' instruction
                 int leaInstAddr = findSequence(binary, position, new byte[] { 0x48, 0x8D, 0x0D });
 
                 if (leaInstAddr == -1)
-                    throw new RoutineFailedException("Could not find address of instruction that loads known flag");
+                    break;
 
                 // Next instruction should be a 'jmp'
+                // yes this is essentially just a really bad pattern scan
                 if (binary[leaInstAddr + 7] != 0xE9)
                 {
                     position = leaInstAddr + 3;
                     continue;
                 }
 
-                int leaInstOperand = BitConverter.ToInt32(binary, leaInstAddr + 3);
-                int leaTargetAddr = leaInstAddr + 7 + leaInstOperand;
+                int leaTargetAddr = ResolveInstTargetAddr(binary, leaInstAddr);
 
                 // Weird oddity - the target address specified by the lea instruction may
                 // itself be offset up to 0x0F00 bytes prior, with an alignment of 0x0100
                 for (int i = 0; i > -0xFF00; i -= 0x0100)
                 {
-                    if (leaTargetAddr + i == knownFlagAddress)
+                    foreach (int knownAddress in knownAddresses)
                     {
-                        leaOffset = i;
-                        knownFlagLoadAddress = leaInstAddr;
-                        break;
+                        if (leaTargetAddr + i != knownAddress)
+                            continue;
+
+                        if (possibleOffsets.ContainsKey(i))
+                            possibleOffsets[i]++;
+                        else
+                            possibleOffsets.Add(i, 1);
+
+                        if (knownLeaInstAddr == 0)
+                            knownLeaInstAddr = leaInstAddr;
                     }
                 }
 
                 position = leaInstAddr + 3;
             }
 
+            print("Finished scanning binary");
+
+            var validOffsets = possibleOffsets.Where(x => x.Value == knownAddresses.Count);
+
+            if (validOffsets.Count() != 1)
+                throw new RoutineFailedException("Could not find correct data address offset");
+
+            int dataAddrOffset = validOffsets.First().Key;
+
             // After the lea instruction comes a jmp instruction
             // The target address of this instruction is a subroutine which all registered
             // flags go through
-            // There are different subroutines for each type (FFlag, FInt, FString, etc)
+            // There are separate subroutines for each type (FFlag, FInt, FString, etc)
             // which are all aligned by 0x20
 
-            int jmpInstAddr = knownFlagLoadAddress + 7;
-            int jmpInstOperand = BitConverter.ToInt32(binary, jmpInstAddr + 1);
-            int jmpTargetAddr = jmpInstAddr + 5 + jmpInstOperand;
+            int jmpTargetAddr = ResolveInstTargetAddr(binary, knownLeaInstAddr + 7);
 
             var typeAddresses = new Dictionary<int, string>
             {
@@ -136,16 +182,14 @@ namespace RobloxClientTracker
             };
 
             position = 0;
-
-            while (true)
+            while (position < binary.Length)
             {
-                jmpInstAddr = findSequence(binary, position, new byte[] { 0xE9 });
+                int jmpInstAddr = findSequence(binary, position, new byte[] { 0xE9 });
 
                 if (jmpInstAddr == -1)
                     break;
 
-                jmpInstOperand = BitConverter.ToInt32(binary, jmpInstAddr + 1);
-                jmpTargetAddr = jmpInstAddr + 5 + jmpInstOperand;
+                jmpTargetAddr = ResolveInstTargetAddr(binary, jmpInstAddr);
 
                 if (!typeAddresses.TryGetValue(jmpTargetAddr, out string flagType))
                 {
@@ -153,30 +197,28 @@ namespace RobloxClientTracker
                     continue;
                 }
 
-                int leaAddress = jmpInstAddr - 7;
-                int targetLeaOffset = BitConverter.ToInt32(binary, leaAddress + 3);
-                int targetLeaAddress = leaAddress + 7 + targetLeaOffset + leaOffset;
+                int targetLeaAddress = ResolveInstTargetAddr(binary, jmpInstAddr - 7, dataAddrOffset);
 
                 string flagName = "";
 
-                if (flagType != "SFFlag")
-                {
-                    // Check if it's a dynamic flag
-                    // The operand of the 'mov' instruction will be 0x2 if it is
-
-                    int movAddress = jmpInstAddr - 20;
-                    int movValue = binary[movAddress + 2];
-
-                    if (movValue == 0x2)
-                        flagName += 'D';
-                }
+                // Check if it's a dynamic flag
+                // The operand of the 'mov' instruction will be 0x2 if it is
+                if (flagType != "SFFlag" && binary[jmpInstAddr - 18] == 0x2)
+                    flagName += 'D';
 
                 flagName += flagType;
 
                 for (int i = targetLeaAddress; binary[i] != 0; i++)
+                {
+                    // ascii control characters - if we encounter these, something has gone seriously wrong
+                    if (binary[i] < 0x20 || binary[i] > 0x7F)
+                        throw new RoutineFailedException("Encountered invalid data");
+
                     flagName += Convert.ToChar(binary[i]);
+                }
 
                 flags.Add($"[C++] {flagName}");
+
                 position = jmpInstAddr + 1;
             }
         }
@@ -288,16 +330,16 @@ namespace RobloxClientTracker
             // !! FIXME: Find some way to switch between these two techniques and fallback to the executable scan as a fail-safe.
             print("Scanning C++ flags...");
 
-            /*try
+            try
             {
                 ScanFlagsUsingInstructions(flags);
             }
             catch (Exception ex)
             {
                 print($"Failed to scan with static analysis! ({ex.GetType().FullName}: {ex.Message})", ConsoleColor.Yellow);
-                print("Attempting to scan by dumping StudioAppSettings...", ConsoleColor.Yellow);*/
+                print("Attempting to scan by dumping StudioAppSettings...", ConsoleColor.Yellow);
                 ScanFlagsUsingExecutable(flags);
-            //}
+            }
 
             timer.Stop();
             print($"FastVariable scan completed in {timer.Elapsed} with {flags.Count} variables");
