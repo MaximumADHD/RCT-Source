@@ -102,6 +102,7 @@
     <Compile Include="Utility\ModelHasher.cs" />
     <Compile Include="Shaders\ShaderFile.cs" />
     <Compile Include="Shaders\ShaderPack.cs" />
+    <Compile Include="Utility\OrderedContractResolver.cs" />
   </ItemGroup>
   <ItemGroup>
     <None Include="App.config" />
