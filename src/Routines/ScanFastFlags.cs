@@ -174,11 +174,11 @@ namespace RobloxClientTracker
 
             var typeAddresses = new Dictionary<int, string>
             {
-                { jmpTargetAddr + 0x20 * 0, "FFlag"   },
-                { jmpTargetAddr + 0x20 * 1, "SFFlag"  },
-                { jmpTargetAddr + 0x20 * 2, "FInt"    },
-                { jmpTargetAddr + 0x20 * 3, "FLog"    },
-                { jmpTargetAddr + 0x20 * 4, "FString" },
+                { jmpTargetAddr,                   "FFlag"   },
+                { jmpTargetAddr + 0x40,            "SFFlag"  },
+                { jmpTargetAddr + 0x40 + 0x20,     "FInt"    },
+                { jmpTargetAddr + 0x40 + 0x20 * 2, "FLog"    },
+                { jmpTargetAddr + 0x40 + 0x20 * 3, "FString" },
             };
 
             position = 0;
@@ -220,6 +220,12 @@ namespace RobloxClientTracker
                 flags.Add($"[C++] {flagName}");
 
                 position = jmpInstAddr + 1;
+            }
+
+            foreach (string flagType in typeAddresses.Values)
+            {
+                if (!flags.Where(x => x.StartsWith($"[C++] {flagType}")).Any())
+                    throw new RoutineFailedException($"No C++ {flagType}s were detected");
             }
         }
 
