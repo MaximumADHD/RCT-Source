@@ -17,6 +17,7 @@ using Newtonsoft.Json.Linq;
 
 using RobloxDeployHistory;
 using RobloxStudioModManager;
+using RobloxClientTracker.Utility;
 
 #pragma warning disable IDE1006 // Naming Styles
 
@@ -652,6 +653,11 @@ namespace RobloxClientTracker
             const string fflagEndpoint = "https://clientsettingscdn.roblox.com/v1/settings/application?applicationName=";
             initGitBinding(Settings.Default.FFlagRepoName);
 
+            var settings = new JsonSerializerSettings()
+            {
+                ContractResolver = new OrderedContractResolver()
+            };
+
             // Start tracking...
             git("reset --hard origin/main");
             git("pull");
@@ -659,7 +665,7 @@ namespace RobloxClientTracker
             return startRoutineLoop(async () =>
             {
                 var taskPool = new List<Task>();
-                var sets = new ConcurrentDictionary<string, Dictionary<string, string>>();
+                var sets = new ConcurrentDictionary<string, Dictionary<string, object>>();
 
                 foreach (string platform in fflagPlatforms)
                 {
@@ -688,13 +694,26 @@ namespace RobloxClientTracker
                             JObject root = JObject.Load(reader);
                             JObject appSettings = root.Value<JObject>("applicationSettings");
 
-                            var data = new Dictionary<string, string>();
+                            var data = new Dictionary<string, object>();
 
                             foreach (var pair in appSettings)
                             {
                                 string key = pair.Key;
                                 string value = appSettings.Value<string>(key);
-                                data.Add(key, value);
+                                object insert;
+
+                                if (value == "True")
+                                    insert = true;
+                                else if (value == "False")
+                                    insert = false;
+                                else if (long.TryParse(value, out long l))
+                                    insert = l;
+                                else if (value.StartsWith("True") || value.StartsWith("False"))
+                                    insert = value.Substring(0, 1).ToLowerInvariant() + value.Substring(1);
+                                else
+                                    insert = value;
+
+                                data.Add(key, insert);
                             }
 
                             sets.TryAdd(platform, data);
@@ -729,37 +748,13 @@ namespace RobloxClientTracker
                     if (!sets.TryGetValue(platform, out var set))
                         continue;
 
-                    var keys = set
-                        .Select(pair => pair.Key)
-                        .OrderBy(key => key)
-                        .ToArray();
+                    var sorted = set
+                        .OrderBy(kv => kv.Key, StringComparer.Ordinal)
+                        .ToDictionary(kv => kv.Key, kv => kv.Value);
 
-                    var result = new StringBuilder();
-                    result.AppendLine("{");
-                    
-                    for (int i = 0; i < keys.Length; i++)
-                    {
-                        string key = keys[i];
-
-                        string value = set[key];
-                        string lower = value.ToLowerInvariant();
-
-                        if (i != 0)
-                            result.Append(",\r\n");
-
-                        if (lower == "true" || lower == "false")
-                            value = lower;
-                        else if (int.TryParse(value, out int testInt))
-                            value = testInt.ToString();
-                        else
-                            value = '"' + value.Replace("\\", "\\\\").Replace("\"", "\\\"") + '"';
-
-                        result.Append($"\t\"{key}\": {value}");
-                    }
-
-                    result.Append("\r\n}");
-
+                    string result = JsonConvert.SerializeObject(sorted, Formatting.Indented, settings);
                     string filePath = Path.Combine(stageDir, platform + ".json");
+
                     string newFile = result.ToString();
                     string oldFile = "";
 
@@ -775,7 +770,7 @@ namespace RobloxClientTracker
                 
                 string timeStamp = DateTime.Now.ToString(CultureInfo.InvariantCulture);
 
-                if (stageCommit(timeStamp))
+                if (stageCommit(timeStamp, "*.*"))
                 {
                     print("Pushing to GitHub...", CYAN);
                     git("push");
