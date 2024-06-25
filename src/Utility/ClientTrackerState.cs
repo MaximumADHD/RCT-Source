@@ -13,8 +13,8 @@ namespace RobloxClientTracker
         public string Version { get; set; } = "";
 
         public VersionManifest VersionData { get; set; } = new VersionManifest();
-        public Dictionary<string, string> FileManifest { get; set; } = new Dictionary<string, string>();
-        public Dictionary<string, PackageState> PackageManifest { get; set; } = new Dictionary<string, PackageState>();
+        public SortedDictionary<string, string> FileManifest { get; set; } = new SortedDictionary<string, string>();
+        public SortedDictionary<string, PackageState> PackageManifest { get; set; } = new SortedDictionary<string, PackageState>();
 
         public Dictionary<string, string> ModelManifest { get; set; } = new Dictionary<string, string>();
         public Dictionary<string, Dictionary<string, string>> ShaderManifest = new Dictionary<string, Dictionary<string, string>>();

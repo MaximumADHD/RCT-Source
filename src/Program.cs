@@ -18,6 +18,7 @@ using Newtonsoft.Json.Linq;
 using RobloxDeployHistory;
 using RobloxStudioModManager;
 using RobloxClientTracker.Utility;
+using RobloxFiles;
 
 #pragma warning disable IDE1006 // Naming Styles
 
@@ -88,31 +89,43 @@ namespace RobloxClientTracker
         {
             "PCDesktopClient",
             "MacDesktopClient",
+            "PlayStationClient",
+            "XboxClient",
+            "iOSApp",
+            "UWPApp",
+            "AndroidApp",
+            "PCStudioApp",
+            "MacStudioApp",
+
             "PCStudioBootstrapper",
             "MacStudioBootstrapper",
             "PCClientBootstrapper",
             "MacClientBootstrapper",
-            "XboxClient",
-            "AndroidApp",
-            "iOSApp",
-            "PCStudioApp",
-            "MacStudioApp",
-            "UWPApp",
         };
 
-        static readonly IReadOnlyList<string> boringFiles = new List<string>()
+        static readonly string[] fflagPrefixes = new string[]
         {
-            "rbxManifest.txt",
-            "rbxPkgManifest.txt",
+            "FFlag",
+            "FString",
+            "FInt",
+            "FLog",
 
-            "rbxManifest.csv",
-            "rbxPkgManifest.csv",
+            "DFFlag",
+            "DFString",
+            "DFInt",
+            "DFLog",
 
-            "version.txt",
-            "version-guid.txt",
+            "SFFlag",
+            "SFString",
+            "SFInt",
+            "SFLog",
+        };
 
-            "CppTree.txt",
-            "DeepStrings.txt",
+        static readonly string[] fflagBuckets = new string[]
+        {
+            "LIVE",
+            "zcanary",
+            "zintegration",
         };
 
         static readonly IReadOnlyList<string> filesToCopy = new List<string>
@@ -650,7 +663,7 @@ namespace RobloxClientTracker
         static Task TrackFFlagsAsync()
         {
             // Initialize Repository
-            const string fflagEndpoint = "https://clientsettingscdn.roblox.com/v1/settings/application?applicationName=";
+            const string fflagEndpoint = "https://clientsettingscdn.roblox.com/v2/settings/application/";
             initGitBinding(Settings.Default.FFlagRepoName);
 
             var settings = new JsonSerializerSettings()
@@ -664,21 +677,28 @@ namespace RobloxClientTracker
 
             return startRoutineLoop(async () =>
             {
-                var taskPool = new List<Task>();
-                var sets = new ConcurrentDictionary<string, Dictionary<string, object>>();
+                var flags = new SortedDictionary<string, SortedDictionary<string, SortedDictionary<string, object>>>();
 
-                foreach (string platform in fflagPlatforms)
+                foreach (string bucketId in fflagBuckets)
                 {
-                    Task updatePlatform = Task.Run(async () =>
+                    string suffix = "";
+
+                    if (bucketId != "LIVE")
+                        suffix = $"/bucket/{bucketId}";
+
+                    print($"Scanning bucket {bucketId}...", GREEN);
+
+                    foreach (string platform in fflagPlatforms)
                     {
                         string json = "";
-
+                        print($"\tScanning platform {platform}...", YELLOW);
+                        
                         try
                         {
-                            using (WebClient http = new WebClient())
+                            using (var http = new WebClient())
                             {
                                 http.Headers.Set("UserAgent", "RobloxClientTracker");
-                                json = await http.DownloadStringTaskAsync(fflagEndpoint + platform);
+                                json = await http.DownloadStringTaskAsync(fflagEndpoint + platform + suffix);
                             }
                         }
                         catch
@@ -689,12 +709,16 @@ namespace RobloxClientTracker
 
                         using (var jsonText = new StringReader(json))
                         {
-                            JsonTextReader reader = new JsonTextReader(jsonText);
-
+                            var reader = new JsonTextReader(jsonText);
+                            
                             JObject root = JObject.Load(reader);
                             JObject appSettings = root.Value<JObject>("applicationSettings");
 
-                            var data = new Dictionary<string, object>();
+                            if (appSettings == null)
+                            {
+                                print($"\tMissing??", RED);
+                                continue;
+                            }
 
                             foreach (var pair in appSettings)
                             {
@@ -713,49 +737,224 @@ namespace RobloxClientTracker
                                 else
                                     insert = value;
 
-                                data.Add(key, insert);
+                                if (!flags.TryGetValue(key, out var flag))
+                                {
+                                    flag = new SortedDictionary<string, SortedDictionary<string, object>>();
+                                    flags[key] = flag;
+                                }
+
+                                if (!flag.TryGetValue(bucketId, out var bucket))
+                                {
+                                    bucket = new SortedDictionary<string, object>();
+                                    flag[bucketId] = bucket;
+                                }
+
+                                bucket[platform] = insert;
+                            }
+                        }
+                    }
+                }
+                
+                // Optimize redundancy.
+                var finalSet = new SortedDictionary<string, object>();
+                print("Optimizing redundancy...", MAGENTA);
+
+                foreach (var flagPair in flags)
+                {
+                    var type = "ChannelsAndPlatforms";
+                    var flag = flagPair.Value;
+
+                    // First check if the buckets have matching content.
+                    object finalObject = flag;
+                    var firstFlag = flag.First();
+
+                    var flagDef = JsonConvert.SerializeObject(firstFlag.Value);
+                    var bucketsEq = true;
+
+                    foreach (var bucket in fflagBuckets)
+                    {
+                        if (flag.TryGetValue(bucket, out var platformPtr))
+                        {
+                            var platform = JsonConvert.SerializeObject(platformPtr);
+
+                            if (platform != flagDef)
+                            {
+                                bucketsEq = false;
+                                break;
+                            }
+                        }
+                        else
+                        {
+                            // Missing a bucket, keep it.
+                            bucketsEq = false;
+                            break;
+                        }
+                    }
+
+                    if (bucketsEq)
+                    {
+                        // See if each platform value is the same.
+                        var platforms = firstFlag.Value;
+                        finalObject = platforms;
+                        type = "Platforms";
+
+                        var platformsEq = true;
+                        var firstPlatform = platforms.First();
+
+                        var value = firstPlatform.Value;
+                        var allBootstrapper = true;
+                        var allClient = true;
+                        var count = 0;
+
+                        foreach (var platformName in fflagPlatforms)
+                        {
+                            if (!platforms.TryGetValue(platformName, out var otherValue))
+                            {
+                                if (allBootstrapper && platformName.EndsWith("Bootstrapper"))
+                                    allBootstrapper = false;
+
+                                if (allClient && !platformName.EndsWith("Bootstrapper"))
+                                    allClient = false;
+
+                                platformsEq = false;
+                                continue;
+                            }
+                            else if (value.ToString() != otherValue.ToString())
+                            {
+                                allBootstrapper = false;
+                                platformsEq = false;
+                                allClient = false;
+                                break;
                             }
 
-                            sets.TryAdd(platform, data);
+                            count += 1;
                         }
-                    });
 
-                    taskPool.Add(updatePlatform);
-                }
+                        if (allBootstrapper && !allClient)
+                            if (count == 4)
+                                platformsEq = true;
 
-                await Task.WhenAll(taskPool);
-                var rootSet = sets["PCDesktopClient"];
+                        if (allClient && !allBootstrapper)
+                            if (count == 9)
+                                platformsEq = true;
 
-                foreach (var platform in fflagPlatforms)
-                {
-                    if (platform == "PCDesktopClient")
-                        continue;
-
-                    if (platform.EndsWith("App") || !platform.EndsWith("Bootstrapper"))
+                        if (platformsEq)
+                        {
+                            finalObject = value;
+                            type = "Unified";
+                        }
+                    }
+                    else
                     {
-                        if (!sets.TryGetValue(platform, out var set))
-                            continue;
+                        // See if platforms can merge.
+                        var platformsMerge = true;
 
-                        foreach (string key in rootSet.Keys)
-                            set.Remove(key);
+                        foreach (var bucketPair in flag)
+                        {
+                            var platforms = bucketPair.Value;
+                            var firstPlatform = platforms.First();
 
-                        sets[platform] = set;
+                            var platformDef = JsonConvert.SerializeObject(firstPlatform.Value);
+                            var platformsEq = true;
+
+                            foreach (var platformPair in platforms)
+                            {
+                                var platform = JsonConvert.SerializeObject(platformPair.Value);
+
+                                if (platform != platformDef)
+                                {
+                                    platformsEq = false;
+                                    break;
+                                }
+                            }
+
+                            if (!platformsEq)
+                            {
+                                platformsMerge = false;
+                                break;
+                            }
+                        }
+
+                        if (platformsMerge)
+                        {
+                            var channels = new SortedDictionary<string, object>();
+                            type = "Channels";
+                            
+                            foreach (var bucketPair in flag)
+                            {
+                                var platform = bucketPair.Value;
+                                var value = platform.First().Value;
+                                channels.Add(bucketPair.Key, value);
+                            }
+
+                            finalObject = channels;
+                        }
+                    }
+
+                    if (finalObject != null)
+                    {
+                        var final = new SortedDictionary<string, object>()
+                        {
+                            { "Type", type },
+                            { "Value", finalObject },
+                        };
+
+                        finalSet.Add(flagPair.Key, final);
                     }
                 }
 
-                foreach (var platform in fflagPlatforms)
+                var legacy = new Dictionary<string, SortedDictionary<string, object>>();
+                print("Building legacy set...", MAGENTA);
+
+                foreach (var flag in flags)
                 {
-                    if (!sets.TryGetValue(platform, out var set))
+                    if (!flag.Value.TryGetValue("LIVE", out var live))
                         continue;
 
-                    var sorted = set
-                        .OrderBy(kv => kv.Key, StringComparer.Ordinal)
-                        .ToDictionary(kv => kv.Key, kv => kv.Value);
+                    foreach (var platform in fflagPlatforms)
+                    {
+                        if (!live.TryGetValue(platform, out var value))
+                            continue;
 
-                    string result = JsonConvert.SerializeObject(sorted, Formatting.Indented, settings);
+                        if (!legacy.TryGetValue(platform, out var set))
+                        {
+                            set = new SortedDictionary<string, object>();
+                            legacy.Add(platform, set);
+                        }
+
+                        set[flag.Key] = value;
+                    }
+                }
+
+                foreach (var set in legacy)
+                {
+                    var platform = set.Key;
+                    var sorted = set.Value;
+                    var baseKey = "";
+
+                    if (platform.EndsWith("Client") || platform.EndsWith("App"))
+                        baseKey = "PCDesktopClient";
+                    else if (platform.EndsWith("Bootstrapper"))
+                        baseKey = "PCClientBootstrapper";
+
+                    if (baseKey.Length > 0 && baseKey != platform)
+                    {
+                        var basePlatform = legacy[baseKey];
+                        var newSort = new SortedDictionary<string, object>();
+
+                        foreach (var pair in sorted)
+                        {
+                            if (basePlatform.ContainsKey(pair.Key))
+                                continue;
+
+                            newSort.Add(pair.Key, pair.Value);
+                        }
+
+                        sorted = newSort;
+                    }
+
+                    string newFile = JsonConvert.SerializeObject(sorted, Formatting.Indented, settings);
                     string filePath = Path.Combine(stageDir, platform + ".json");
-
-                    string newFile = result.ToString();
                     string oldFile = "";
 
                     if (File.Exists(filePath))
@@ -763,11 +962,65 @@ namespace RobloxClientTracker
 
                     if (oldFile != newFile)
                     {
-                        print($"\tUpdating {platform}.json ...", YELLOW);
+                        print($"\tUpdating Legacy {platform}.json ...", YELLOW);
                         File.WriteAllText(filePath, newFile);
                     }
                 }
-                
+
+                string fvars = Path.Combine(stageDir, "FVariables");
+                print("Compiling FVariables...", MAGENTA);
+                Directory.CreateDirectory(fvars);
+
+                foreach (var pair in finalSet)
+                {
+                    var flag = pair.Key;
+                    var jObject = pair.Value;
+
+                    var flagType = "Misc";
+                    var name = flag;
+
+                    foreach (var prefix in fflagPrefixes)
+                    {
+                        if (name.StartsWith(prefix))
+                        {
+                            name = name.Substring(prefix.Length);
+                            flagType = prefix;
+                        }
+                    }
+
+                    var start = name.Substring(0, 1);
+                    var dir = Path.Combine(fvars, flagType, start);
+                    Directory.CreateDirectory(dir);
+
+                    string newFile = JsonConvert.SerializeObject(jObject, Formatting.Indented, settings);
+                    string filePath = Path.Combine(dir, flag + ".json");
+                    string oldFile = "";
+
+                    if (File.Exists(filePath))
+                        oldFile = File.ReadAllText(filePath);
+
+                    if (oldFile != newFile)
+                    {
+                        if (oldFile == "")
+                            print($"\tCreating {flag}.json ...", GREEN);
+                        else
+                            print($"\tUpdating {flag}.json ...", YELLOW);
+
+                        File.WriteAllText(filePath, newFile);
+                    }
+                }
+
+                foreach (var file in Directory.GetFiles(fvars, "*.json", SearchOption.AllDirectories))
+                {
+                    var info = new FileInfo(file);
+                    string name = info.Name.Replace(info.Extension, "");
+
+                    if (finalSet.ContainsKey(name))
+                        continue;
+
+                    print($"\tDeleting {name}.json ...", RED);
+                }
+
                 string timeStamp = DateTime.Now.ToString(CultureInfo.InvariantCulture);
 
                 if (stageCommit(timeStamp, "*.*"))
