@@ -41,14 +41,20 @@ namespace RobloxClientTracker
         public ushort Version { get; private set; }
 
         public ushort NumGroups { get; private set; }
+        public ushort NumNames { get; private set; }
+        public ushort NumFFlags { get; private set; }
         public ushort NumShaders { get; private set; }
-        public ushort NumUnknown { get; private set; }
+        public ushort NumBitNames { get; private set; }
 
         private readonly string[] GroupsImpl;
-        private readonly ShaderFile[] ShadersImpl;
+        private readonly ShaderFile[][] ShadersImpl;
+        private readonly string[] BitNames;
 
         public IReadOnlyList<string> Groups => GroupsImpl;
-        public IReadOnlyList<ShaderFile> Shaders => ShadersImpl;
+
+        public IReadOnlyList<ShaderFile> Shaders => ShadersImpl
+            .SelectMany(groups => groups)
+            .ToList();
 
         public override string ToString()
         {
@@ -62,45 +68,32 @@ namespace RobloxClientTracker
             using (FileStream file = File.OpenRead(filePath))
             using (BinaryReader reader = new BinaryReader(file))
             {
-                uint numNames = 0;
-                uint numFFlags = 0;
-
                 Header = reader.ReadString(4);
                 Version = reader.ReadUInt16();
 
-                if (Version >= 10)
-                {
-                    NumGroups = reader.ReadByte();
-                    numFFlags = reader.ReadByte();
-                }
-                else
-                {
-                    NumGroups = reader.ReadUInt16();
-                }
+                NumGroups = reader.ReadUInt16();
+                NumFFlags = reader.ReadUInt16();
+                NumBitNames = reader.ReadUInt16();
 
+                NumNames = reader.ReadUInt16();
                 NumShaders = reader.ReadUInt16();
-
-                if (Version >= 9)
-                {
-                    numNames = NumShaders;
-                    NumShaders = reader.ReadUInt16();
-                }
 
                 Name = info.Name.Replace(info.Extension, "");
                 Hash = reader.ReadUInt32();
 
                 GroupsImpl = new string[NumGroups];
-                ShadersImpl = new ShaderFile[NumShaders];
+                ShadersImpl = new ShaderFile[NumGroups][];
 
                 // Read Groups
                 for (int i = 0; i < NumGroups; i++)
                     GroupsImpl[i] = reader.ReadString(64);
 
                 // Read Names
-                var names = new ShaderDef[numNames];
-                var fflags = new string[numFFlags];
+                var names = new ShaderDef[NumNames];
+                var fflags = new string[NumFFlags];
+                var bitNames = new string[NumBitNames];
 
-                for (int i = 0; i < numNames; i++)
+                for (int i = 0; i < NumNames; i++)
                 {
                     names[i] = new ShaderDef()
                     {
@@ -109,69 +102,48 @@ namespace RobloxClientTracker
                     };
                 }
 
-                for (int i = 0; i < numFFlags; i++)
+                for (int i = 0; i < NumFFlags; i++)
                     fflags[i] = reader.ReadString(64);
 
-                for (int i = 0; i < NumShaders; i++)
+                for (int i = 0; i < NumBitNames; i++)
                 {
-                    string name = "";
+                    var name = reader.ReadString(64);
+                    var index = reader.ReadByte();
+                    bitNames[index] = name;
+                }
 
-                    if (Version < 9)
-                        name = reader.ReadString(64);
+                for (int i = 0; i < NumGroups; i++)
+                {
+                    var group = new ShaderFile[NumNames];
 
-                    byte[] rawHash = reader.ReadBytes(16);
-                    string hash = Convert.ToBase64String(rawHash);
-
-                    var shader = new ShaderFile
+                    for (int j = 0; j < NumNames; j++)
                     {
-                        Hash = hash,
-                        Offset = reader.ReadInt32(),
-                        Size = reader.ReadInt32(),
-                    };
+                        byte[] rawHash = reader.ReadBytes(16);
+                        string hash = Convert.ToBase64String(rawHash);
 
-                    if (Version > 6)
+                        var shader = new ShaderFile
+                        {
+                            Hash = hash,
+                            Offset = reader.ReadInt32(),
+                            Size = reader.ReadInt32(),
+                        };
+
                         shader.Mask = reader.ReadInt32();
+                        shader.ShaderType = (ShaderType)reader.ReadByte();
+                        shader.Group = Groups[reader.ReadByte()];
 
-                    shader.ShaderType = (ShaderType)reader.ReadByte();
-                    shader.Group = Groups[reader.ReadByte()];
-
-                    if (Version >= 9)
-                    {
                         ushort nameIndex = reader.ReadUInt16();
                         var nameInfo = names[nameIndex];
-                        name = nameInfo.Name;
-                    }
-                    else
-                    {
-                        int skip = Version > 6 ? 2 : 6;
-                        shader.Stub = reader.ReadBytes(skip);
-                    }
 
-                    var flagMasks = new Dictionary<string, ShaderFFlagMask>();
-                    shader.Name = name;
-
-                    if (Version > 9)
-                    {
                         byte[] stub = reader.ReadBytes(32);
-                        /* for (int j = 0; j < numFFlags; j++)
-                        {
-                            string flagName = fflags[j];
+                        shader.Name = nameInfo.Name;
 
-                            // best guess: this enables certain bit-flags on the
-                            // shader when the specified FFlag is enabled/disabled?
-                            // without knowing what the bit-flags represent, it's hard to tell.
-
-                            flagMasks[flagName] = new ShaderFFlagMask
-                            {
-                                WhenEnabled = reader.ReadInt32(),
-                                WhenDisabled = reader.ReadInt32(),
-                            };
-                        }*/
+                        group[j] = shader;
                     }
 
-                    shader.FFlagMasks = flagMasks;
-                    ShadersImpl[i] = shader;
+                    ShadersImpl[i] = group;
                 }
+                
 
                 // Unpack the shader files
                 foreach (ShaderFile shader in Shaders)
