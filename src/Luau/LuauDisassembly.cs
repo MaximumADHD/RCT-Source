@@ -52,8 +52,8 @@ namespace RobloxClientTracker.Luau
 
             if (version == 0)
                 throw new Exception("Ill-formatted Luau.");
-            else if (version < 3 || version > 5)
-                throw new Exception($"Bytecode version mismatch (expected [3..5], got {version})");
+            else if (version < 3 || version > 6)
+                throw new Exception($"Bytecode version mismatch (expected [3..6], got {version})");
 
             var typesVersion = 0;
 
@@ -70,6 +70,17 @@ namespace RobloxClientTracker.Luau
                 Strings[i] = Encoding.UTF8.GetString(str);
             }
 
+            if (typesVersion == 3)
+            {
+                byte index = reader.ReadByte();
+
+                while (index != 0)
+                {
+                    // do nothing... for now.
+                    index = reader.ReadByte();
+                }
+            }
+
             var protoCount = readVarInt();
             Protos = new LuauProto[protoCount];
 
@@ -84,12 +95,41 @@ namespace RobloxClientTracker.Luau
                 if (version >= 4)
                 {
                     proto.Flags = (LuauProtoFlags)reader.ReadByte();
-                    var numTypes = readVarInt();
-
-                    if (numTypes > 0 && typesVersion == 1)
+                    
+                    if (typesVersion == 1)
                     {
-                        byte[] types = reader.ReadBytes(numTypes);
-                        proto.TypeInfo = types;
+                        var typeSize = readVarInt();
+                        
+                        if (typeSize > 0)
+                        {
+                            var headerSize = typeSize > 127 ? 4 : 3;
+                            byte[] types = reader.ReadBytes(typeSize);
+
+                            if (headerSize == 4)
+                            {
+                                types[0] = (byte)((typeSize & 127) | (1 << 7));
+                                types[1] = (byte)(typeSize >> 7);
+                                types[2] = 0;
+                                types[3] = 0;
+                            }
+                            else
+                            {
+                                types[0] = (byte)typeSize;
+                                types[1] = 0;
+                                types[2] = 0;
+                            }
+
+                            proto.TypeInfo = types;
+                        }
+                    }
+                    else if (typesVersion == 2 || typesVersion == 3)
+                    {
+                        var typeSize = readVarInt();
+
+                        if (typeSize > 0)
+                        {
+                            proto.TypeInfo = reader.ReadBytes(typeSize);
+                        }
                     }
                 }
 
@@ -167,7 +207,7 @@ namespace RobloxClientTracker.Luau
                         }
                         default:
                         {
-                            Debug.Assert(false, "Unexpected constant kind");
+                            Debug.Assert(false, $"Unexpected constant kind {constant.Type}");
                             break;
                         }
                     }

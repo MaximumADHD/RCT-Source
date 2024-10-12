@@ -336,16 +336,16 @@ namespace RobloxClientTracker
             // !! FIXME: Find some way to switch between these two techniques and fallback to the executable scan as a fail-safe.
             print("Scanning C++ flags...");
 
-            try
-            {
-                ScanFlagsUsingInstructions(flags);
-            }
-            catch (Exception ex)
-            {
-                print($"Failed to scan with static analysis! ({ex.GetType().FullName}: {ex.Message})", ConsoleColor.Yellow);
-                print("Attempting to scan by dumping StudioAppSettings...", ConsoleColor.Yellow);
+            //try
+            //{
+            //    ScanFlagsUsingInstructions(flags);
+            //}
+            //catch (Exception ex)
+            //{
+            //    print($"Failed to scan with static analysis! ({ex.GetType().FullName}: {ex.Message})", ConsoleColor.Yellow);
+            //    print("Attempting to scan by dumping StudioAppSettings...", ConsoleColor.Yellow);
                 ScanFlagsUsingExecutable(flags);
-            }
+            //}
 
             timer.Stop();
             print($"FastVariable scan completed in {timer.Elapsed} with {flags.Count} variables");

@@ -148,8 +148,16 @@ namespace RobloxClientTracker
             if (source.IsCompiled)
             {
                 var disassembler = new LuauDisassembly(buffer);
-                string disassembly = disassembler.BuildDisassembly();
-                writeFile(writePath + ".s", disassembly, LogRbxm);
+
+                try
+                {
+                    string disassembly = disassembler.BuildDisassembly();
+                    writeFile(writePath + ".s", disassembly, LogRbxm);
+                }
+                catch
+                {
+                    print("\t\t!!FIXME: Error writing diassembly for " + writePath, ConsoleColor.Red);
+                }
             }
         }
 

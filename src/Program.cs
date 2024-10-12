@@ -901,6 +901,10 @@ namespace RobloxClientTracker
 
                         finalSet.Add(flagPair.Key, final);
                     }
+                    else
+                    {
+                        Debugger.Break();
+                    }
                 }
 
                 var legacy = new Dictionary<string, SortedDictionary<string, object>>();
@@ -985,6 +989,7 @@ namespace RobloxClientTracker
                         {
                             name = name.Substring(prefix.Length);
                             flagType = prefix;
+                            break;
                         }
                     }
 
@@ -1019,6 +1024,7 @@ namespace RobloxClientTracker
                         continue;
 
                     print($"\tDeleting {name}.json ...", RED);
+                    File.Delete(file);
                 }
 
                 string timeStamp = DateTime.Now.ToString(CultureInfo.InvariantCulture);

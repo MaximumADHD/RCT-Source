@@ -336,6 +336,12 @@ namespace RobloxClientTracker.Luau
                             code++; // AUX
                             break;
                         }
+                        case LuauOpcode.FASTCALL3:
+                        {
+                            line += $"{(LuauBuiltinFunction)A()} R{B()} R{AUX & 0xFF} R{(AUX >> 8) & 0xFF}";
+                            code++; // AUX
+                            break;
+                        }
                         case LuauOpcode.JUMPXEQKB:
                         case LuauOpcode.JUMPXEQKNIL:
                         {

@@ -296,9 +296,17 @@ namespace RobloxClientTracker.Luau
         // A: target register (see FORGLOOP for register layout)
         FORGPREP_INEXT,
 
+        // FASTCALL3: perform a fast call of a built-in function using 3 register arguments
+        // A: builtin function id (see LuauBuiltinFunction)
+        // B: source argument register
+        // C: jump offset to get to following CALL
+        // AUX: source register 2 in least-significant byte
+        // AUX: source register 3 in second least-significant byte
+        FASTCALL3,
+
         // FORGPREP_NEXT: prepare FORGLOOP with 2 output variables (no AUX encoding), assuming generator is luaB_next, and jump to FORGLOOP
         // A: target register (see FORGLOOP for register layout)
-        FORGPREP_NEXT = 61,
+        FORGPREP_NEXT,
 
         // NATIVECALL: start executing new function in native code
         // this is a pseudo-instruction that is never emitted by bytecode compiler, but can be constructed at runtime to accelerate native code dispatch
