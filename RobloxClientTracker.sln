@@ -15,6 +15,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "RobloxFileFormat", "..\Robl
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "RobloxDeployHistory", "..\Roblox-Deploy-History\RobloxDeployHistory.csproj", "{1CE1A9DF-C2FF-49C4-9B7C-792C962C339F}"
 EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "RbxFFlagDumper.Lib", "..\rbxfflagdumper\RbxFFlagDumper.Lib\RbxFFlagDumper.Lib.csproj", "{4FF3A687-3F0C-4021-8A3E-0952B0A0BF0D}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -85,6 +87,18 @@ Global
 		{1CE1A9DF-C2FF-49C4-9B7C-792C962C339F}.Release|Any CPU.Build.0 = Release|Any CPU
 		{1CE1A9DF-C2FF-49C4-9B7C-792C962C339F}.Release|x64.ActiveCfg = Release|Any CPU
 		{1CE1A9DF-C2FF-49C4-9B7C-792C962C339F}.Release|x64.Build.0 = Release|Any CPU
+		{4FF3A687-3F0C-4021-8A3E-0952B0A0BF0D}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{4FF3A687-3F0C-4021-8A3E-0952B0A0BF0D}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{4FF3A687-3F0C-4021-8A3E-0952B0A0BF0D}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{4FF3A687-3F0C-4021-8A3E-0952B0A0BF0D}.Debug|x64.Build.0 = Debug|Any CPU
+		{4FF3A687-3F0C-4021-8A3E-0952B0A0BF0D}.Internal|Any CPU.ActiveCfg = Debug|Any CPU
+		{4FF3A687-3F0C-4021-8A3E-0952B0A0BF0D}.Internal|Any CPU.Build.0 = Debug|Any CPU
+		{4FF3A687-3F0C-4021-8A3E-0952B0A0BF0D}.Internal|x64.ActiveCfg = Debug|Any CPU
+		{4FF3A687-3F0C-4021-8A3E-0952B0A0BF0D}.Internal|x64.Build.0 = Debug|Any CPU
+		{4FF3A687-3F0C-4021-8A3E-0952B0A0BF0D}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{4FF3A687-3F0C-4021-8A3E-0952B0A0BF0D}.Release|Any CPU.Build.0 = Release|Any CPU
+		{4FF3A687-3F0C-4021-8A3E-0952B0A0BF0D}.Release|x64.ActiveCfg = Release|Any CPU
+		{4FF3A687-3F0C-4021-8A3E-0952B0A0BF0D}.Release|x64.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
@@ -94,6 +108,7 @@ Global
 		{585EAB66-7C64-482D-8619-2D2EB972CFC9} = {B83D911D-EAD1-44D7-B289-D11D23883E76}
 		{CF50C0E2-23A7-4DC1-B4B2-E60CDE716253} = {B83D911D-EAD1-44D7-B289-D11D23883E76}
 		{1CE1A9DF-C2FF-49C4-9B7C-792C962C339F} = {B83D911D-EAD1-44D7-B289-D11D23883E76}
+		{4FF3A687-3F0C-4021-8A3E-0952B0A0BF0D} = {B83D911D-EAD1-44D7-B289-D11D23883E76}
 	EndGlobalSection
 	GlobalSection(ExtensibilityGlobals) = postSolution
 		SolutionGuid = {D2E83754-AF4E-4BCF-B29F-BCA851143365}

@@ -122,6 +122,10 @@
     </EmbeddedResource>
   </ItemGroup>
   <ItemGroup>
+    <ProjectReference Include="..\..\rbxfflagdumper\RbxFFlagDumper.Lib\RbxFFlagDumper.Lib.csproj">
+      <Project>{4ff3a687-3f0c-4021-8a3e-0952b0a0bf0d}</Project>
+      <Name>RbxFFlagDumper.Lib</Name>
+    </ProjectReference>
     <ProjectReference Include="..\..\Roblox-API-Dump-Tool\RobloxApiDumpTool.csproj">
       <Project>{585eab66-7c64-482d-8619-2d2eb972cfc9}</Project>
       <Name>RobloxApiDumpTool</Name>
