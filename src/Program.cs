@@ -608,7 +608,7 @@ namespace RobloxClientTracker
                             .Skip(1)
                             .First();
 
-                        await RobloxApiDumpTool.ArgProcessor.Run(new Dictionary<string, string>()
+                        var result = await RobloxApiDumpTool.ArgProcessor.Run(new Dictionary<string, string>()
                         {
                             { "-updatePages", pageDir },
                             { "-version", versionId },
@@ -628,26 +628,32 @@ namespace RobloxClientTracker
                     }
                     else
                     {
-                        // Create three commits:
-                        // - One for packages.
+                        // Create several commits:
                         // - One for lua files.
+                        // - One for shader files.
+                        // - One for image files.
+                        // - One for JSON files.
+                        // - One for CSV files.
                         // - One for everything else.
 
                         string versionId = info.Version;
                         print("Creating commits...", YELLOW);
 
-                        bool didStagePackages = stageCommit($"{versionId} (Packages)", "*/_Index/*");
-                        bool didStageScripts = stageCommit($"{versionId} (Scripts)", "*.lua", "*.luac", "*.luac.s");
-                        bool didStageCore = stageCommit(versionId, "*.*");
+                        stageCommit($"{versionId} (Scripts)", 
+                            "*.lua", "*.luac", "*.luac.s",
+                            "*.luau", "*.luauc", "*.luauc.s"
+                        );
 
-                        if (didStagePackages || didStageScripts || didStageCore)
-                        {
-                            print("Pushing to GitHub...", CYAN);
-                            git("push");
+                        stageCommit($"{versionId} (Shaders)", "*.frag", "*.vert");
+                        stageCommit($"{versionId} (Images)", "*.png", "*.jpg", "*.bmp", "*.gif");
+                        stageCommit($"{versionId} (JSON)", "*.json");
+                        stageCommit($"{versionId} (CSV)", "*.csv");
+                        stageCommit(versionId, "*.*");
 
-                            print("\tDone!", GREEN);
-                        }
+                        print("Pushing to GitHub...", CYAN);
+                        git("push");
 
+                        print("\tDone!", GREEN);
                         state.Version = info.VersionGuid;
                     }
                 }

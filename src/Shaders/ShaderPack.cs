@@ -9,15 +9,15 @@ namespace RobloxClientTracker
     public class ShaderDef
     {
         public string Name;
-        public uint Mask;
+        public uint Flags;
 
         public override string ToString()
         {
             string bits = Convert
-                .ToString(Mask, 16)
+                .ToString(Flags, 16)
                 .PadLeft(8, '0');
 
-            return $"{Name}_{bits}";
+            return $"{Name} [{bits}]";
         }
     }
 
@@ -48,7 +48,9 @@ namespace RobloxClientTracker
 
         private readonly string[] GroupsImpl;
         private readonly ShaderFile[][] ShadersImpl;
+
         private readonly string[] BitNames;
+        private readonly byte[] Stub;
 
         public IReadOnlyList<string> Groups => GroupsImpl;
 
@@ -98,7 +100,7 @@ namespace RobloxClientTracker
                     names[i] = new ShaderDef()
                     {
                         Name = reader.ReadString(64),
-                        Mask = reader.ReadUInt32(),
+                        Flags = reader.ReadUInt32(),
                     };
                 }
 
@@ -135,16 +137,27 @@ namespace RobloxClientTracker
                         ushort nameIndex = reader.ReadUInt16();
                         var nameInfo = names[nameIndex];
 
-                        byte[] stub = reader.ReadBytes(32);
+                        shader.Stub = new ulong[4]
+                        {
+                            reader.ReadUInt64(),
+                            reader.ReadUInt64(),
+                            reader.ReadUInt64(),
+                            reader.ReadUInt64(),
+                        };
+
+                        var suffix = Convert.ToString(shader.Mask, 16).PadLeft(8, '0');
                         shader.Name = nameInfo.Name;
+
+                        if (suffix != "00000000")
+                            shader.Name += '_' + suffix;
 
                         group[j] = shader;
                     }
 
+                    Array.Sort(group);
                     ShadersImpl[i] = group;
                 }
                 
-
                 // Unpack the shader files
                 foreach (ShaderFile shader in Shaders)
                 {

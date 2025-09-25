@@ -31,7 +31,7 @@ namespace RobloxClientTracker
         public ShaderType ShaderType { get; set; }
         public string Group { get; set; }
 
-        public byte[] Stub { get; set; }
+        public ulong[] Stub { get; set; }
         public byte[] Buffer { get; set; }
 
         public int Mask { get; set; }
