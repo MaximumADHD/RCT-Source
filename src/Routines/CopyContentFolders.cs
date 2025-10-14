@@ -1,6 +1,7 @@
 ﻿using System;
+using System.Collections.Generic;
 using System.IO;
-
+using System.Linq;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 
@@ -14,17 +15,36 @@ namespace RobloxClientTracker
 
         private readonly string[] contentFolders = new string[]
         {
-            "avatar",
-            "configs",
-            "scripts",
-            "api_docs",
-            "LuaPackages",
-            "translations",
-            "textures"
+            @"content\avatar",
+            @"content\configs",
+            @"content\scripts",
+            @"content\api_docs",
+            @"content\textures",
+            @"content\studio_svg_textures",
+
+            @"ExtraContent\LuaPackages",
+
+            // !! TODO: Add this when I figure out what to do with DataModelPatch & ServerCoreScripts
+            // "ExtraContent/models",
+            
+            @"ExtraContent\scripts",
+            @"ExtraContent\textures",
+            @"ExtraContent\translations",
+
+            @"StudioContent\textures",
         };
 
         public CopyContentFolders()
         {
+            foreach (string folder in contentFolders)
+            {
+                var path = folder.Split('\\');
+                var dest = path.Last();
+
+                var destFolder = Path.Combine(stageDir, dest.Replace('_', '-'));
+                resetDirectory(destFolder);
+            }
+
             foreach (string folder in contentFolders)
             {
                 var copy = new Action(() => copyContentFolder(folder));
@@ -34,8 +54,11 @@ namespace RobloxClientTracker
 
         private void copyContentFolder(string folderName)
         {
-            string srcFolder = Path.Combine(studioDir, "content", folderName);
-            string destFolder = resetDirectory(stageDir, folderName.Replace('_', '-'));
+            var path = folderName.Split('\\');
+            var dest = path.Last();
+
+            string srcFolder = Path.Combine(studioDir, folderName);
+            string destFolder = createDirectory(stageDir, dest.Replace('_', '-'));
 
             print($"Copying {srcFolder} to {destFolder}");
             copyDirectory(srcFolder, destFolder);

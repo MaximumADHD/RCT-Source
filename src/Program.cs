@@ -38,11 +38,12 @@ namespace RobloxClientTracker
         const string ARG_PARENT = "-parent";
         const string ARG_CHANNEL = "-channel";
         const string ARG_TRACK_MODE = "-trackMode";
+        const string ARG_MANUAL_BUILD = "-manualBuild";
 
         const string ARG_FORCE_REBASE = "-forceRebase";
         const string ARG_FORCE_UPDATE = "-forceUpdate";
         const string ARG_FORCE_COMMIT = "-forceCommit";
-        const string ARG_MANUAL_BUILD = "-manualBuild";
+        const string ARG_FORCE_INSTALL = "-forceInstall";
 
         const string ARG_VERBOSE_LOGS = "-verboseLogs";
         const string ARG_UPDATE_FREQUENCY = "-updateFrequency";
@@ -68,6 +69,7 @@ namespace RobloxClientTracker
         static bool FORCE_REBASE = false;
         static bool FORCE_UPDATE = false;
         static bool FORCE_COMMIT = false;
+        static bool FORCE_INSTALL = false;
 
         static int UPDATE_FREQUENCY = 5;
         static bool VERBOSE_LOGS = false;
@@ -77,7 +79,7 @@ namespace RobloxClientTracker
         static readonly Type DataMiner = typeof(DataMiner);
 
         public static bool UPDATE_GITHUB_PAGE = false;
-        public static bool FORCE_PACKAGE_ANALYSIS = false;
+        public static bool FORCE_PACKAGE_ANALYSIS = true;
         public static string FORCE_VERSION_GUID = "";
         public static string FORCE_VERSION_ID = "";
 
@@ -445,8 +447,8 @@ namespace RobloxClientTracker
             {
                 Channel = channel,
                 GenerateMetadata = true,
-                RemapExtraContent = true,
                 CanShutdownStudio = false,
+                ForceInstall = FORCE_INSTALL,
                 OverrideStudioDirectory = studioDir
             };
 
@@ -561,6 +563,9 @@ namespace RobloxClientTracker
                         File.Copy(sourcePath, destination);
                     }
 
+                    // Clear package data.
+                    RobloxFileMiner.ResetPackages();
+
                     // Run data mining routines in parallel
                     // so they don't block each other.
 
@@ -576,7 +581,7 @@ namespace RobloxClientTracker
                         routines.Add(routine);
                     }
 
-                    await Task.WhenAll(routines);
+                    await Task.WhenAll(routines.AsParallel().Select(async task => await task));
                     var exceptions = new List<Exception>();
 
                     foreach (Task routine in routines)
@@ -1092,6 +1097,9 @@ namespace RobloxClientTracker
 
             if (argMap.ContainsKey(ARG_MANUAL_BUILD))
                 MANUAL_BUILD = true;
+
+            if (argMap.ContainsKey(ARG_FORCE_INSTALL))
+                FORCE_INSTALL = true;
 
             if (argMap.ContainsKey(ARG_UPDATE_FREQUENCY))
                 if (!int.TryParse(argMap[ARG_UPDATE_FREQUENCY], out UPDATE_FREQUENCY))

@@ -15,45 +15,30 @@ namespace RobloxClientTracker
 
         public UnpackPlugins()
         {
-            foreach (string folder in pluginFolders)
+            foreach (string folderName in pluginFolders)
             {
-                var unpack = new Action(() => unpackPlugin(folder));
-                addRoutine(unpack);
-            }
-        }
+                string studioDir = studio.GetLocalStudioDirectory();
 
-        private void unpackPlugin(string folderName)
-        {
-            string studioDir = studio.GetLocalStudioDirectory();
+                string srcFolder = Path.Combine(studioDir, folderName, "Optimized_Embedded_Signature");
+                string destFolder = Path.Combine(stageDir, folderName);
 
-            string srcFolder = Path.Combine(studioDir, folderName, "Optimized_Embedded_Signature");
-            string destFolder = Path.Combine(stageDir, folderName);
+                print($"\tCopying {srcFolder} to {destFolder}");
+                copyDirectory(srcFolder, destFolder);
 
-            print($"\tCopying {srcFolder} to {destFolder}");
-            copyDirectory(srcFolder, destFolder);
-
-            foreach (string file in Directory.GetFiles(destFolder))
-            {
-                if (file.EndsWith(".rbxm", Program.InvariantString) || file.EndsWith(".rbxmx", Program.InvariantString))
+                foreach (string file in Directory.GetFiles(destFolder))
                 {
-                    print($"\t\tUnpacking {localPath(file)}");
-                    unpackFile(file, true);
+                    addRoutine(() =>
+                    {
+                        if (file.EndsWith(".rbxm", Program.InvariantString) || file.EndsWith(".rbxmx", Program.InvariantString))
+                        {
+                            print($"\t\tUnpacking {localPath(file)}");
+                            unpackFile(file, true);
+                            return;
+                        }
 
-                    continue;
+                        File.Delete(file);
+                    });
                 }
-
-                File.Delete(file);
-            }
-
-            foreach (string folder in Directory.GetDirectories(destFolder))
-            {
-                var info = new DirectoryInfo(folder);
-                string file = Path.Combine(srcFolder, info.Name + ".rbxm");
-
-                if (File.Exists(file))
-                    continue;
-
-                Directory.Delete(folder, true);
             }
         }
     }

@@ -20,7 +20,7 @@ namespace RobloxClientTracker
     public abstract class RobloxFileMiner : MultiTaskMiner
     {
         private static Dictionary<string, string> modelManifest => state.ModelManifest;
-        private static Dictionary<string, Dictionary<Instance, Instance>> packages = new Dictionary<string, Dictionary<Instance, Instance>>();
+        public static Dictionary<string, Instance> Packages = new Dictionary<string, Instance>();
 
         private static readonly FileLogConfig LogRbxm = new FileLogConfig()
         {
@@ -29,15 +29,18 @@ namespace RobloxClientTracker
         };
 
         // absolute last resort for stupid inconsistent package locations lol.
-
         private static readonly List<string> KnownPackages = new List<string>()
         {
             "Cryo",
+            "React",
             "Roact",
             "Rodux",
+            "UIBlox",
             "TestEZ",
             "UILibrary",
             "RoactRodux",
+            "ReactRoblox",
+            "DeveloperFramework",
         };
 
         protected static void copyDirectory(string source, string target)
@@ -123,21 +126,24 @@ namespace RobloxClientTracker
             return (value.Length > 0);
         }
 
+        public static void ResetPackages()
+        {
+            resetDirectory(stageDir, "CompiledPackages");
+            Packages.Clear();
+        }
+
         private void recordPackage(Instance inst)
         {
-            var parent = inst.Parent;
             inst.Parent = null;
 
-            if (inst.Name.StartsWith("_"))
+            if (Packages.ContainsKey(inst.Name))
                 return;
 
-            if (!packages.TryGetValue(inst.Name, out var list))
-            {
-                list = new Dictionary<Instance, Instance>();
-                packages.Add(inst.Name, list);
-            }
+            var packageDir = createDirectory(stageDir, "CompiledPackages");
+            Packages.Add(inst.Name, inst);
 
-            list.Add(inst, parent);
+            print($"Unpacking compiled package {inst.Name}...", ConsoleColor.Magenta);
+            unpackImpl(inst, packageDir, inst.Parent);
         }
 
         private void writeScript(string writePath, ProtectedString source)
@@ -173,18 +179,12 @@ namespace RobloxClientTracker
                 .GetChildren()
                 .ToList();
 
-            if (name == ".robloxrc")
-            {
-                // Definitely rotriever package.
-                recordPackage(packageBin);
-                return;
-            }
-            else if (KnownPackages.Contains(name) && children.Count > 0)
+            if (KnownPackages.Contains(name) && children.Count > 0)
             {
                 recordPackage(inst);
                 return;
             }
-            else if (name.StartsWith("_"))
+            else if (name == "_Index")
             {
                 // Probably a package managed by Rotriever.
                 if (packageBin != null)

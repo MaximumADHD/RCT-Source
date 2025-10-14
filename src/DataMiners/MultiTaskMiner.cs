@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Threading.Tasks;
 
 namespace RobloxClientTracker
@@ -23,9 +24,11 @@ namespace RobloxClientTracker
 
             foreach (Action routine in routines)
             {
-                Task task = Task.Run(routine);
+                Task task = new Task(routine);
                 tasks.Add(task);
             }
+
+            Parallel.ForEach(tasks, task => task.Start());
 
             Task multiTask = Task.WhenAll(tasks);
             multiTask.Wait();
