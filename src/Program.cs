@@ -50,7 +50,6 @@ namespace RobloxClientTracker
 
         const string ARG_FORCE_VERSION_ID = "-forceVersionId";
         const string ARG_FORCE_VERSION_GUID = "-forceVersionGuid";
-        const string ARG_UPDATE_GITHUB_PAGE = "-updateGitHubPage";
         const string ARG_FORCE_PACKAGE_ANALYSIS = "-forcePackageAnalysis";
 
         public const ConsoleColor DARK_YELLOW = ConsoleColor.DarkYellow;
@@ -78,7 +77,6 @@ namespace RobloxClientTracker
         static TrackMode TRACK_MODE = TrackMode.Client;
         static readonly Type DataMiner = typeof(DataMiner);
 
-        public static bool UPDATE_GITHUB_PAGE = false;
         public static bool FORCE_PACKAGE_ANALYSIS = true;
         public static string FORCE_VERSION_GUID = "";
         public static string FORCE_VERSION_ID = "";
@@ -175,6 +173,7 @@ namespace RobloxClientTracker
         public static StudioBootstrapper studio { get; private set; }
 
         static readonly Dictionary<string, string> argMap = new Dictionary<string, string>();
+        static string startDir;
         
         public static void print(string message, ConsoleColor color = GRAY)
         {
@@ -418,9 +417,6 @@ namespace RobloxClientTracker
 
         static Task TrackClientAsync()
         {
-            if (UPDATE_GITHUB_PAGE)
-                initGitBinding(Settings.Default.ApiSite, true);
-
             // Initialize the git repository.
             bool init = initGitBinding(Settings.Default.ClientRepoName);
 
@@ -476,6 +472,7 @@ namespace RobloxClientTracker
             return startRoutineLoop(async () =>
             {
                 // Check if the parent branch has been updated
+                var postScript = Path.Combine(startDir, "PostUpdate.bat");
 
                 if (branch != parent)
                 {
@@ -603,26 +600,6 @@ namespace RobloxClientTracker
                     if (exceptions.Count > 0)
                         throw new AggregateException(exceptions);
                     
-                    if (UPDATE_GITHUB_PAGE)
-                    {
-                        string pageDir = Path.Combine(trunk, "stage", Settings.Default.ApiSite);
-                        print("Updating API page...");
-
-                        string versionId = info.Version
-                            .Split('.')
-                            .Skip(1)
-                            .First();
-
-                        var result = await RobloxApiDumpTool.ArgProcessor.Run(new Dictionary<string, string>()
-                        {
-                            { "-updatePages", pageDir },
-                            { "-version", versionId },
-                            { "-full", "" },
-                        });
-
-                        Directory.SetCurrentDirectory(stageDir);
-                    }
-
                     if (MANUAL_BUILD)
                     {
                         print($"Stage assembled! Please create a commit with -m \"{info.Version}\"!", GREEN);
@@ -645,8 +622,7 @@ namespace RobloxClientTracker
                         print("Creating commits...", YELLOW);
 
                         stageCommit($"{versionId} (Scripts)", 
-                            "*.lua", "*.luac", "*.luac.s",
-                            "*.luau", "*.luauc", "*.luauc.s"
+                            "*.lua", "*.luac", "*.luac.s"
                         );
 
                         stageCommit($"{versionId} (Shaders)", "*.frag", "*.vert");
@@ -659,6 +635,10 @@ namespace RobloxClientTracker
                         git("push");
 
                         print("\tDone!", GREEN);
+
+                        if (File.Exists(postScript))
+                            Process.Start(postScript);
+
                         state.Version = info.VersionGuid;
                     }
                 }
@@ -1052,6 +1032,8 @@ namespace RobloxClientTracker
 
         static void Main(string[] args)
         {
+            startDir = Directory.GetCurrentDirectory();
+
             #region Process Launch Options
             string argKey = "";
 
@@ -1117,9 +1099,6 @@ namespace RobloxClientTracker
             if (argMap.ContainsKey(ARG_TRACK_MODE))
                 if (!Enum.TryParse(argMap[ARG_TRACK_MODE], out TRACK_MODE))
                     print($"Bad {ARG_TRACK_MODE} provided.", RED);
-
-            if (argMap.ContainsKey(ARG_UPDATE_GITHUB_PAGE))
-                UPDATE_GITHUB_PAGE = true;
 
             if (TRACK_MODE == TrackMode.FastFlags)
             {

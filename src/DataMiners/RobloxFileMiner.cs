@@ -148,15 +148,21 @@ namespace RobloxClientTracker
 
         private void writeScript(string writePath, ProtectedString source)
         {
+            var info = new FileInfo(writePath);
             byte[] buffer = source.RawBuffer;
-            writeFile(writePath, buffer, LogRbxm);
-
+            
             if (source.IsCompiled)
             {
-                var disassembler = new LuauDisassembly(buffer);
+                var rawSource = writePath.Replace(".luac", ".lua");
+
+                if (File.Exists(rawSource))
+                    return;
+
+                writeFile(writePath, buffer, LogRbxm);
 
                 try
                 {
+                    var disassembler = new LuauDisassembly(buffer);
                     string disassembly = disassembler.BuildDisassembly();
                     writeFile(writePath + ".s", disassembly, LogRbxm);
                 }
@@ -164,6 +170,21 @@ namespace RobloxClientTracker
                 {
                     print("\t\t!!FIXME: Error writing diassembly for " + writePath, ConsoleColor.Red);
                 }
+            }
+            else
+            {
+                var compiled = writePath + "c";
+                var disassembled = compiled + ".s";
+
+                if (!File.Exists(compiled))
+                    return;
+
+                File.Delete(compiled);
+
+                if (!File.Exists(disassembled))
+                    return;
+
+                File.Delete(disassembled);
             }
         }
 
