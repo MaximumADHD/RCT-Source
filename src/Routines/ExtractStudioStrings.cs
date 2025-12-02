@@ -8,7 +8,8 @@ using System.Text;
 using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 
-#pragma warning disable IDE1006 // Naming Styles
+using PeNet;
+using System.Diagnostics;
 
 namespace RobloxClientTracker
 {
@@ -66,12 +67,15 @@ namespace RobloxClientTracker
             // Roblox Studio, so preload it first.
 
             print("Reading Roblox Studio...");
+            PeFile.TryParse(studioPath, out PeFile studio);
+
             studioExe = File.ReadAllText(studioPath);
             segmentSize = studioExe.Length / maxThreads;
 
             // Now execute the routines.
-            addRoutine(extractCppTypes);
-            addRoutine(extractDeepStrings);
+            //addRoutine(extractCppTypes);
+            //addRoutine(extractDeepStrings);
+            addRoutine(extractLuauTypes);
             
             base.ExecuteRoutine();
         }
@@ -190,6 +194,132 @@ namespace RobloxClientTracker
             
             string cppTreePath = Path.Combine(stageDir, "CppTree.txt");
             writeFile(cppTreePath, cppTree);
+        }
+
+        private void extractLuauTypes()
+        {
+            int lastEndIndex = 0;
+            var entryPoint = studioExe.IndexOf("declare function wait", lastEndIndex);
+
+            if (entryPoint < 0)
+                return;
+
+            var grabStringAtIndex = new Func<int, string>((index) =>
+            {
+                int startIndex = index;
+
+                while (true)
+                {
+                    char charAt = studioExe[--startIndex];
+
+                    if (charAt == '\0')
+                    {
+                        startIndex++;
+                        break;
+                    }
+                }
+
+                int endIndex = studioExe.IndexOf('\0', startIndex);
+                lastEndIndex = endIndex;
+
+                return studioExe.Substring(startIndex, endIndex - startIndex);
+            });
+
+            var nextStringIndex = new Func<int, int>((index) =>
+            {
+                while (true)
+                {
+                    char charAt = studioExe[++index];
+
+                    if (charAt == '\0')
+                        continue;
+
+                    return index;
+                }
+            });
+
+            var builder = new StringBuilder();
+            builder.AppendLine("-- Automated Dump of all statically declared type annotations injected into Roblox's Luau environment.");
+            builder.AppendLine("-- This does not include anything from stock Luau or Roblox's reflection system.\n");
+
+            builder.AppendLine("-- Types here are *not* guaranteed to be stable, bugs may come up that break this scanner.");
+            builder.AppendLine("-- If anything critical does disappear from here, file an issue at this link:");
+            builder.AppendLine("-- https://github.com/MaximumADHD/Roblox-Client-Tracker/issues\n");
+
+            var offset = 0;
+            var unknownTypes = 0;
+            var at = entryPoint;
+
+            var lastTable = "";
+            var lastKey = "";
+
+            while (true)
+            {
+                var str = grabStringAtIndex(at);
+
+                if (str[0] == '{')
+                {
+                    if (lastTable != "")
+                    {
+                        string key = $"unknownType{offset:X}";
+
+                        if (lastTable.Contains("CreatorType")) // HACK
+                        {
+                            key = "Creator";
+                            unknownTypes--;
+                        }
+
+                        builder.AppendLine("----------------------------------------------");
+                        builder.AppendLine($"-- Offset: {offset:X}");
+                        builder.AppendLine("----------------------------------------------");
+                        builder.AppendLine($"        type {key} = {lastTable}");
+                    }
+
+                    offset = lastEndIndex - str.Length;
+                    lastTable = str;
+                    lastKey = "";
+                }
+                else
+                {
+                    if (lastKey != "")
+                        break;
+
+                    if (lastTable == "")
+                        offset = lastEndIndex - str.Length;
+
+                    builder.AppendLine("----------------------------------------------");
+                    builder.AppendLine($"-- Offset: {offset:X}");
+                    builder.AppendLine("----------------------------------------------");
+
+                    if (Regex.IsMatch(str, "^[A-z0-9_]+$"))
+                    {
+                        builder.AppendLine($"        type {str} = {lastTable}");
+                        lastKey = str;
+                    }
+                    else
+                    {
+                        string section = "";
+
+                        if (str.Contains("type Expectation"))
+                            section = "TestEZ";
+                        else if (str.Contains("workspace"))
+                            section = "RobloxGlobals";
+                        else if (str.Contains("Behavior"))
+                            section = "BehaviorScript";
+
+                        builder.AppendLine(section != "" ? $"\n-- SECTION BEGIN: {section}\n{str}\n\n-- SECTION END: {section}\n" : str);
+                    }
+
+                    lastTable = "";
+                }
+
+                at = nextStringIndex(lastEndIndex);
+            }
+
+            var result = builder.ToString();
+            var file = Path.Combine(stageDir, "LuauTypes.d.luau");
+
+            File.WriteAllText(file, result);
         }
     }
 }
