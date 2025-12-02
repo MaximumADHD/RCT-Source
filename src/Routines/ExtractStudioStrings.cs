@@ -73,8 +73,8 @@ namespace RobloxClientTracker
             segmentSize = studioExe.Length / maxThreads;
 
             // Now execute the routines.
-            //addRoutine(extractCppTypes);
-            //addRoutine(extractDeepStrings);
+            addRoutine(extractCppTypes);
+            addRoutine(extractDeepStrings);
             addRoutine(extractLuauTypes);
             
             base.ExecuteRoutine();
