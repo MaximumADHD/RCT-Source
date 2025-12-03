@@ -22,14 +22,39 @@ public static class Extensions
         return registry?.GetValue(key, "") as string;
     }
 
-    public static string ReadString(this BinaryReader reader, int bufferSize)
+    public static string ReadString(this BinaryReader reader, int? bufferSize)
     {
-        byte[] sequence = reader?.ReadBytes(bufferSize);
-        string value = Encoding.UTF8.GetString(sequence);
+        if (bufferSize.HasValue)
+        {
+            byte[] sequence = reader?.ReadBytes(bufferSize.Value);
+            string value = Encoding.UTF8.GetString(sequence);
 
-        int length = value.IndexOf('\0');
-        value = (length > 0 ? value.Substring(0, length) : value);
+            int length = value.IndexOf('\0');
+            value = (length > 0 ? value.Substring(0, length) : value);
 
-        return value;
+            return value;
+        }
+        else
+        {
+            var stream = reader.BaseStream;
+            var sequence = new byte[0];
+
+            var startIndex = stream.Position;
+            var endIndex = startIndex;
+
+            while (endIndex < stream.Length)
+            {
+                if (reader.ReadByte() == 0)
+                    break;
+
+                endIndex++;
+            }
+                
+
+            stream.Position = startIndex;
+            sequence = reader.ReadBytes((int)(endIndex - startIndex));
+
+            return Encoding.UTF8.GetString(sequence);
+        }
     }
 }

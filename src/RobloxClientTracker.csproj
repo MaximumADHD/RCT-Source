@@ -59,8 +59,8 @@
     <Reference Include="Newtonsoft.Json, Version=13.0.0.0, Culture=neutral, PublicKeyToken=30ad4fe6b2a6aeed, processorArchitecture=MSIL">
       <HintPath>..\packages\Newtonsoft.Json.13.0.1\lib\net45\Newtonsoft.Json.dll</HintPath>
     </Reference>
-    <Reference Include="PeNet, Version=5.0.0.0, Culture=neutral, PublicKeyToken=6cf2bfba59bcfb3f, processorArchitecture=MSIL">
-      <HintPath>..\packages\PeNet.5.0.0\lib\netstandard2.0\PeNet.dll</HintPath>
+    <Reference Include="PeNet, Version=5.1.0.0, Culture=neutral, PublicKeyToken=6cf2bfba59bcfb3f, processorArchitecture=MSIL">
+      <HintPath>..\packages\PeNet.5.1.0\lib\netstandard2.0\PeNet.dll</HintPath>
     </Reference>
     <Reference Include="PeNet.Asn1, Version=2.0.1.0, Culture=neutral, PublicKeyToken=1e2e3568f0050bf5, processorArchitecture=MSIL">
       <HintPath>..\packages\PeNet.Asn1.2.0.1\lib\net461\PeNet.Asn1.dll</HintPath>
@@ -91,6 +91,7 @@
     <Compile Include="DataMiners\DataMiner.cs" />
     <Compile Include="DataMiners\MultiTaskMiner.cs" />
     <Compile Include="DataMiners\RobloxFileMiner.cs" />
+    <Compile Include="Exceptions\CppDumpException.cs" />
     <Compile Include="Luau\LuauByteCode.cs" />
     <Compile Include="Luau\LuauConst.cs" />
     <Compile Include="Luau\LuauDisassembly.cs" />
@@ -145,10 +146,6 @@
     </EmbeddedResource>
   </ItemGroup>
   <ItemGroup>
-    <ProjectReference Include="..\..\rbxfflagdumper\RbxFFlagDumper.Lib\RbxFFlagDumper.Lib.csproj">
-      <Project>{4ff3a687-3f0c-4021-8a3e-0952b0a0bf0d}</Project>
-      <Name>RbxFFlagDumper.Lib</Name>
-    </ProjectReference>
     <ProjectReference Include="..\..\Roblox-API-Dump-Tool\RobloxApiDumpTool.csproj">
       <Project>{585eab66-7c64-482d-8619-2d2eb972cfc9}</Project>
       <Name>RobloxApiDumpTool</Name>

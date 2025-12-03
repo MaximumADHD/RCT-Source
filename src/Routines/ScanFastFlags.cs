@@ -3,16 +3,12 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
 using System.Linq;
-using System.Text.RegularExpressions;
-using System.Text;
 using System.Threading.Tasks;
 
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 using RobloxClientTracker.Properties;
-using RobloxClientTracker.Exceptions;
 using RobloxStudioModManager;
-using RbxFFlagDumper.Lib;
 
 namespace RobloxClientTracker
 {
@@ -111,24 +107,31 @@ namespace RobloxClientTracker
             var timer = new Stopwatch();
 
             print("Starting FastVariable scan...");
-
             timer.Start();
 
-            print("Scanning Lua flags...");
-            var luaFlags = StudioFFlagDumper.DumpLuaFlags(studioDir);
-
-            print("Scanning C++ flags...");
+            var luaFlags = new List<string>();
             var cppFlags = new List<string>();
 
-            try
+            if (!Program.Conditions.Contains("noluaflags"))
             {
-                cppFlags = StudioFFlagDumper.DumpCppFlags(studioPath);
+                print("Scanning Lua flags...");
+                luaFlags = StudioFFlagDumper.DumpLuaFlags(extraContent);
             }
-            catch (Exception ex)
+
+            if (!Program.Conditions.Contains("nocppflags"))
             {
-                print($"{ex.GetType().FullName}: {ex.Message}", ConsoleColor.Yellow);
-                print($"Falling back to StudioAppSettings dump", ConsoleColor.Yellow);
-                ScanFlagsUsingExecutable(cppFlags);
+                print("Scanning C++ flags...");
+
+                try
+                {
+                    cppFlags = StudioFFlagDumper.DumpCppFlags(studioPath);
+                }
+                catch (Exception ex)
+                {
+                    print($"{ex.GetType().FullName}: {ex.Message}", ConsoleColor.Yellow);
+                    print($"Falling back to StudioAppSettings dump", ConsoleColor.Yellow);
+                    ScanFlagsUsingExecutable(cppFlags);
+                }
             }
             
             timer.Stop();

@@ -1,6 +1,7 @@
-﻿using System;
-using System.Collections.Generic;
+﻿using PeNet;
+using System;
 using System.Collections.Concurrent;
+using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Runtime.InteropServices;
@@ -8,8 +9,7 @@ using System.Text;
 using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 
-using PeNet;
-using System.Diagnostics;
+using RobloxStudioModManager;
 
 namespace RobloxClientTracker
 {
@@ -56,10 +56,38 @@ namespace RobloxClientTracker
         private const short segmentOverrun = 512;
         private const byte maxThreads = 32;
 
+        private byte[] rawStudioExe;
         private string studioExe;
-        private int segmentSize;
+        private PeFile exe;
 
+        private int segmentSize;
         private static readonly object undecorate = new object();
+
+        private long rvaToFileOffset(uint rva)
+        {
+            var sectionHeaders = exe.ImageSectionHeaders;
+
+            var section = sectionHeaders.FirstOrDefault(s =>
+                rva >= s.VirtualAddress && rva < s.VirtualAddress + s.VirtualSize);
+
+            if (section == null)
+                return -1;
+
+            return rva - section.VirtualAddress + section.PointerToRawData;
+        }
+
+        private uint fileOffsetToRva(long fileOffset)
+        {
+            var sectionHeaders = exe.ImageSectionHeaders;
+
+            var section = sectionHeaders.FirstOrDefault(s =>
+                fileOffset >= s.PointerToRawData && fileOffset < s.PointerToRawData + s.SizeOfRawData);
+
+            if (section == null)
+                return 0;
+
+            return (uint)(fileOffset - section.PointerToRawData + section.VirtualAddress);
+        }
 
         public override void ExecuteRoutine()
         {
@@ -67,15 +95,23 @@ namespace RobloxClientTracker
             // Roblox Studio, so preload it first.
 
             print("Reading Roblox Studio...");
-            PeFile.TryParse(studioPath, out PeFile studio);
+            rawStudioExe = File.ReadAllBytes(studioPath);
+            exe = new PeFile(rawStudioExe);
 
-            studioExe = File.ReadAllText(studioPath);
+            studioExe = Encoding.UTF8.GetString(rawStudioExe); // PROBABLY UNSAFE??
             segmentSize = studioExe.Length / maxThreads;
 
             // Now execute the routines.
-            addRoutine(extractCppTypes);
-            addRoutine(extractDeepStrings);
-            addRoutine(extractLuauTypes);
+            var conditions = Program.Conditions;
+
+            if (!conditions.Contains("nodeep"))
+                addRoutine(extractDeepStrings);
+
+            if (!conditions.Contains("nocpp"))
+                addRoutine(extractCppTypes);
+
+            if (!conditions.Contains("noluautypes"))
+                addRoutine(extractLuauTypes);
             
             base.ExecuteRoutine();
         }
@@ -196,13 +232,16 @@ namespace RobloxClientTracker
             writeFile(cppTreePath, cppTree);
         }
 
+
         private void extractLuauTypes()
         {
-            int lastEndIndex = 0;
-            var entryPoint = studioExe.IndexOf("declare function wait", lastEndIndex);
+            // Fetch the static inections first.
+            var entryPoint = studioExe.IndexOf("declare function wait");
 
             if (entryPoint < 0)
                 return;
+
+            int lastEndIndex = 0;
 
             var grabStringAtIndex = new Func<int, string>((index) =>
             {
@@ -238,7 +277,9 @@ namespace RobloxClientTracker
                 }
             });
 
+            var locations = new List<int>();
             var builder = new StringBuilder();
+
             builder.AppendLine("-- Automated Dump of all statically declared type annotations injected into Roblox's Luau environment.");
             builder.AppendLine("-- This does not include anything from stock Luau or Roblox's reflection system.\n");
 
@@ -246,74 +287,123 @@ namespace RobloxClientTracker
             builder.AppendLine("-- If anything critical does disappear from here, file an issue at this link:");
             builder.AppendLine("-- https://github.com/MaximumADHD/Roblox-Client-Tracker/issues\n");
 
-            var offset = 0;
-            var unknownTypes = 0;
             var at = entryPoint;
-
-            var lastTable = "";
-            var lastKey = "";
 
             while (true)
             {
                 var str = grabStringAtIndex(at);
 
-                if (str[0] == '{')
-                {
-                    if (lastTable != "")
-                    {
-                        string key = $"unknownType{offset:X}";
+                if (!str.Contains("declare") && !str.Contains("type"))
+                    break;
 
-                        if (lastTable.Contains("CreatorType")) // HACK
+                string section = "";
+
+                if (str.Contains("type Expectation"))
+                    section = "TestEZ";
+                else if (str.Contains("workspace"))
+                    section = "RobloxGlobals";
+                else if (str.Contains("Behavior"))
+                    section = "BehaviorScript";
+
+                builder.AppendLine(section != "" ? $"\n-- SECTION BEGIN: {section}\n{str}\n\n-- SECTION END: {section}\n" : str);
+                at = nextStringIndex(lastEndIndex);
+            }
+
+            // Scan assembly patterns
+            // 48:8D15 ???????? | lea rdx, qword ptr ds:[????????????] | Offset address of Type Declaration String
+            // 48:8D0D ???????? | lea rcx, qword ptr ds:[????????????] | Offset of Type Name String
+            // E8 ????????      | call robloxstudiobeta.????????????   | Registers Type in Luau
+
+            const int patternLength = 19;
+            const string scanPattern = "48 8D 15 ?? ?? ?? ?? 48 8D 0D ?? ?? ?? ?? E8 ?? ?? ?? ??";
+
+            var sectionHeaders = exe.ImageSectionHeaders;
+            var textHeader = sectionHeaders.First(x => x.Name == ".text");
+
+            var scanner = new PatternScanner(rawStudioExe, scanPattern, (int)textHeader.PointerToRawData, (int)textHeader.SizeOfRawData);
+            var offsets = new List<int>();
+
+            while (at < rawStudioExe.Length)
+            {
+                while (!scanner.Finished)
+                {
+                    at = scanner.FindNext();
+
+                    if (offsets.Count > 0)
+                    {
+                        var lastOffset = offsets.Last();
+                        var diff = at - lastOffset;
+
+                        if (diff == patternLength)
                         {
-                            key = "Creator";
-                            unknownTypes--;
+                            offsets.Add(at);
+                            continue;
                         }
 
-                        builder.AppendLine("----------------------------------------------");
-                        builder.AppendLine($"-- Offset: {offset:X}");
-                        builder.AppendLine("----------------------------------------------");
-                        builder.AppendLine($"        type {key} = {lastTable}");
-                    }
-
-                    offset = lastEndIndex - str.Length;
-                    lastTable = str;
-                    lastKey = "";
-                }
-                else
-                {
-                    if (lastKey != "")
                         break;
-
-                    if (lastTable == "")
-                        offset = lastEndIndex - str.Length;
-
-                    builder.AppendLine("----------------------------------------------");
-                    builder.AppendLine($"-- Offset: {offset:X}");
-                    builder.AppendLine("----------------------------------------------");
-
-                    if (Regex.IsMatch(str, "^[A-z0-9_]+$"))
-                    {
-                        builder.AppendLine($"        type {str} = {lastTable}");
-                        lastKey = str;
                     }
                     else
                     {
-                        string section = "";
-
-                        if (str.Contains("type Expectation"))
-                            section = "TestEZ";
-                        else if (str.Contains("workspace"))
-                            section = "RobloxGlobals";
-                        else if (str.Contains("Behavior"))
-                            section = "BehaviorScript";
-
-                        builder.AppendLine(section != "" ? $"\n-- SECTION BEGIN: {section}\n{str}\n\n-- SECTION END: {section}\n" : str);
+                        offsets.Add(at);
                     }
-
-                    lastTable = "";
                 }
 
-                at = nextStringIndex(lastEndIndex);
+                if (offsets.Count < 3)
+                {
+                    // Try again.
+                    offsets.Clear();
+                    continue;
+                }
+
+                break;
+            }
+
+            using (var stream = new MemoryStream(rawStudioExe))
+            using (var reader = new BinaryReader(stream))
+            {
+                uint baseRVA;
+                string value, name;
+
+                uint valueRVA, nameRVA;
+                long valueOffset, nameOffset;
+
+                foreach (int baseOffset in offsets)
+                {
+                    // Convert file offset to RVA
+                    baseRVA = fileOffsetToRva(baseOffset);
+
+                    if (baseRVA == 0)
+                        continue;
+
+                    // Read the 4-byte offset for the value (RDX register)
+                    stream.Position = baseOffset + 3;
+                    valueOffset = reader.ReadInt32();
+
+                    // Calculate value RVA and offset in stream.
+                    valueRVA = (uint)(baseRVA + 7 + valueOffset);
+                    valueOffset = rvaToFileOffset(valueRVA);
+
+                    // Read the 4-byte offset for the name (RCX register)
+                    stream.Position = baseOffset + 10;
+                    nameOffset = reader.ReadInt32();
+
+                    // Calculate target RVA: next instruction RVA + offset
+                    nameRVA = (uint)(baseRVA + 14 + nameOffset);
+                    nameOffset = rvaToFileOffset(nameRVA);
+
+                    // Now read the actual strings
+                    stream.Position = (int)valueOffset;
+                    value = reader.ReadString(null);
+
+                    stream.Position = (int)nameOffset;
+                    name = reader.ReadString(null);
+
+                    // Skip if strings look invalid
+                    if (string.IsNullOrWhiteSpace(name) || string.IsNullOrWhiteSpace(value))
+                        continue;
+
+                    builder.AppendLine($"type {name} = {value}\n");
+                }
             }
 
             var result = builder.ToString();

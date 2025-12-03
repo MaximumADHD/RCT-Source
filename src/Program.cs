@@ -32,14 +32,23 @@ namespace RobloxClientTracker
             FastFlags
         }
 
+        public enum CommitMode
+        {
+            IfChanged,
+            Forced,
+            Never,
+        }
+
         public static readonly Encoding UTF8 = new UTF8Encoding(false);
 
         const string ARG_BRANCH = "-branch";
         const string ARG_PARENT = "-parent";
         const string ARG_CHANNEL = "-channel";
         const string ARG_TRACK_MODE = "-trackMode";
+        const string ARG_POST_SCRIPT = "-postScript";
         const string ARG_MANUAL_BUILD = "-manualBuild";
 
+        const string ARG_NO_COMMIT = "-noCommit";
         const string ARG_FORCE_REBASE = "-forceRebase";
         const string ARG_FORCE_UPDATE = "-forceUpdate";
         const string ARG_FORCE_COMMIT = "-forceCommit";
@@ -51,6 +60,8 @@ namespace RobloxClientTracker
         const string ARG_FORCE_VERSION_ID = "-forceVersionId";
         const string ARG_FORCE_VERSION_GUID = "-forceVersionGuid";
         const string ARG_FORCE_PACKAGE_ANALYSIS = "-forcePackageAnalysis";
+        const string ARG_DATA_MINERS = "-dataMiners";
+        const string ARG_CONDITIONS = "-conditions";
 
         public const ConsoleColor DARK_YELLOW = ConsoleColor.DarkYellow;
         public const ConsoleColor DARK_GREEN = ConsoleColor.DarkGreen;
@@ -67,7 +78,6 @@ namespace RobloxClientTracker
 
         static bool FORCE_REBASE = false;
         static bool FORCE_UPDATE = false;
-        static bool FORCE_COMMIT = false;
         static bool FORCE_INSTALL = false;
 
         static int UPDATE_FREQUENCY = 5;
@@ -75,12 +85,17 @@ namespace RobloxClientTracker
         static bool MANUAL_BUILD = false;
 
         static TrackMode TRACK_MODE = TrackMode.Client;
+        static CommitMode COMMIT_MODE = CommitMode.IfChanged;
         static readonly Type DataMiner = typeof(DataMiner);
 
         public static bool FORCE_PACKAGE_ANALYSIS = true;
         public static string FORCE_VERSION_GUID = "";
         public static string FORCE_VERSION_ID = "";
 
+        public static string DataMinerFilter = "";
+        public static string[] Conditions = new string[0];
+
+        public static List<DataMiner> DataMiners = new List<DataMiner>();
         public static readonly CultureInfo Invariant = CultureInfo.InvariantCulture;
         public static NumberFormatInfo InvariantNumber = NumberFormatInfo.InvariantInfo;
         public const StringComparison InvariantString = StringComparison.InvariantCulture;
@@ -164,6 +179,7 @@ namespace RobloxClientTracker
         public static string branch = "roblox";
         public static string parent = "roblox";
         public static Channel channel = "LIVE";
+        public static string postScript = "";
 
         public static string trunk { get; private set; }
         public static string stageDir { get; private set; }
@@ -452,11 +468,27 @@ namespace RobloxClientTracker
             studio.EchoFeed += new MessageFeed((msg) => print(msg, YELLOW));
             studio.StatusFeed += new MessageFeed((msg) => print(msg, MAGENTA));
 
-            var dataMiners = AppDomain.CurrentDomain.GetAssemblies()
+            DataMiners = AppDomain.CurrentDomain.GetAssemblies()
                 .SelectMany(assembly => assembly.GetTypes())
                 .Where(type => !type.IsAbstract && type.IsSubclassOf(DataMiner))
                 .Select(type => Activator.CreateInstance(type))
-                .Cast<DataMiner>();
+                .Cast<DataMiner>()
+                .ToList();
+
+            if (!string.IsNullOrEmpty(DataMinerFilter))
+            {
+                var nameList = DataMinerFilter.Split(',', ';')
+                    .Select(name => name.ToLowerInvariant())
+                    .ToList();
+
+                var query = from miner in DataMiners
+                            let name = miner.GetType().Name
+                            where nameList.Contains(name.ToLowerInvariant())
+                            select miner;
+
+                DataMiners = query.ToList();
+                print($"DataMiners Filtered To: {string.Join(",", DataMiners)}");
+            }
 
             // Report set arguments.
             if (FORCE_REBASE)
@@ -465,15 +497,27 @@ namespace RobloxClientTracker
             if (FORCE_UPDATE)
                 print("\tCaution: FORCE_UPDATE is set to true!", YELLOW);
 
-            if (FORCE_COMMIT)
+            if (COMMIT_MODE == CommitMode.Forced)
                 print("\tCaution: FORCE_COMMIT is set to true!", YELLOW);
+            else if (COMMIT_MODE == CommitMode.Never)
+                print("\tCaution: NO_COMMIT is set to true!", YELLOW);
+
+            if (string.IsNullOrEmpty(postScript))
+            {
+                var autoPost = Path.Combine(startDir, "PostUpdate.bat");
+
+                if (File.Exists(autoPost))
+                {
+                    postScript = autoPost;
+                }
+            }
+
+            if (!Debugger.IsAttached)
+                git($"reset --hard origin/{branch}");
 
             // Start the main thread.
             return startRoutineLoop(async () =>
             {
-                // Check if the parent branch has been updated
-                var postScript = Path.Combine(startDir, "PostUpdate.bat");
-
                 if (branch != parent)
                 {
                     // Check if we are behind the upstream.
@@ -569,7 +613,7 @@ namespace RobloxClientTracker
                     var routines = new List<Task>();
                     state.Save(studioDir);
 
-                    foreach (DataMiner miner in dataMiners)
+                    foreach (DataMiner miner in DataMiners)
                     {
                         Type type = miner.GetType();
                         print($"Executing data miner routine: {type.Name}", GREEN);
@@ -608,7 +652,7 @@ namespace RobloxClientTracker
                         Console.Read();
                         Environment.Exit(0);
                     }
-                    else
+                    else if (COMMIT_MODE != CommitMode.Never)
                     {
                         // Create several commits:
                         // - One for lua files.
@@ -635,11 +679,23 @@ namespace RobloxClientTracker
                         git("push");
 
                         print("\tDone!", GREEN);
-
-                        if (File.Exists(postScript))
-                            Process.Start(postScript);
-
                         state.Version = info.VersionGuid;
+
+                        if (!string.IsNullOrEmpty(postScript))
+                        {
+                            var fileInfo = new FileInfo(postScript);
+                            var dirName = fileInfo.DirectoryName;
+
+                            var startInfo = new ProcessStartInfo
+                            {
+                                FileName = "cmd.exe",
+                                Arguments = $"/k \"{postScript}\"",
+                                WorkingDirectory = dirName
+                            };
+
+                            var proc = Process.Start(startInfo);
+                            proc.WaitForExit();
+                        }
                     }
                 }
                 else
@@ -1072,7 +1128,9 @@ namespace RobloxClientTracker
                 FORCE_UPDATE = true;
 
             if (argMap.ContainsKey(ARG_FORCE_COMMIT))
-                FORCE_COMMIT = true;
+                COMMIT_MODE = CommitMode.Forced;
+            else if (argMap.ContainsKey(ARG_NO_COMMIT))
+                COMMIT_MODE = CommitMode.Never;
 
             if (argMap.ContainsKey(ARG_VERBOSE_LOGS))
                 VERBOSE_LOGS = true;
@@ -1100,6 +1158,10 @@ namespace RobloxClientTracker
                 if (!Enum.TryParse(argMap[ARG_TRACK_MODE], out TRACK_MODE))
                     print($"Bad {ARG_TRACK_MODE} provided.", RED);
 
+            if (argMap.ContainsKey(ARG_POST_SCRIPT))
+                if (File.Exists(argMap[ARG_POST_SCRIPT]))
+                    postScript = argMap[ARG_POST_SCRIPT];
+
             if (TRACK_MODE == TrackMode.FastFlags)
             {
                 if (!argMap.ContainsKey(ARG_UPDATE_FREQUENCY))
@@ -1107,6 +1169,13 @@ namespace RobloxClientTracker
 
                 branch = "fflags";
             }
+
+            if (argMap.ContainsKey(ARG_DATA_MINERS))
+                DataMinerFilter = argMap[ARG_DATA_MINERS];
+
+            if (argMap.ContainsKey(ARG_CONDITIONS))
+                Conditions = argMap[ARG_CONDITIONS].ToLowerInvariant().Split(',', ';');
+
             #endregion
 
             if (TRACK_MODE == TrackMode.Client && !argMap.ContainsKey(ARG_BRANCH))
