@@ -10,6 +10,7 @@ using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 
 using RobloxStudioModManager;
+using System.Diagnostics;
 
 namespace RobloxClientTracker
 {
@@ -288,6 +289,7 @@ namespace RobloxClientTracker
             builder.AppendLine("-- https://github.com/MaximumADHD/Roblox-Client-Tracker/issues\n");
 
             var at = entryPoint;
+            int unknownCount = 0;
 
             while (true)
             {
@@ -304,6 +306,8 @@ namespace RobloxClientTracker
                     section = "RobloxGlobals";
                 else if (str.Contains("Behavior"))
                     section = "BehaviorScript";
+                else
+                    section = $"Unknown_{++unknownCount}";
 
                 builder.AppendLine(section != "" ? $"\n-- SECTION BEGIN: {section}\n{str}\n\n-- SECTION END: {section}\n" : str);
                 at = nextStringIndex(lastEndIndex);
@@ -355,8 +359,22 @@ namespace RobloxClientTracker
                     continue;
                 }
 
+                // Jump back from the first offset by the pattern length and see if it's a match as well.
+                // I don't know why this misses sometimes...
+
+                var restore = scanner.Pos;
+                scanner.Pos = offsets[0] - patternLength;
+
+                var match = scanner.FindNext();
+                scanner.Pos = restore;
+
+                if (match < offsets[0])
+                    offsets.Insert(0, match);
+                
                 break;
             }
+
+            builder.AppendLine("\n-- SECTION BEGIN: Reflection Adjacent\n");
 
             using (var stream = new MemoryStream(rawStudioExe))
             using (var reader = new BinaryReader(stream))
@@ -405,6 +423,8 @@ namespace RobloxClientTracker
                     builder.AppendLine($"type {name} = {value}\n");
                 }
             }
+
+            builder.AppendLine("\n-- SECTION END: Reflection Adjacent");
 
             var result = builder.ToString();
             var file = Path.Combine(stageDir, "LuauTypes.d.luau");

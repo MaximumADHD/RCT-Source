@@ -1174,7 +1174,7 @@ namespace RobloxClientTracker
                 DataMinerFilter = argMap[ARG_DATA_MINERS];
 
             if (argMap.ContainsKey(ARG_CONDITIONS))
-                Conditions = argMap[ARG_CONDITIONS].ToLowerInvariant().Split(',', ';');
+                Conditions = argMap[ARG_CONDITIONS].ToLowerInvariant().Split(',', ';', '+');
 
             #endregion
 

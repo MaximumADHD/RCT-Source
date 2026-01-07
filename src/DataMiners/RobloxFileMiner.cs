@@ -8,6 +8,7 @@ using RobloxFiles;
 using System.Diagnostics;
 using RobloxFiles.DataTypes;
 using RobloxClientTracker.Luau;
+using System.Text;
 #pragma warning disable IDE1006 // Naming Styles
 
 namespace RobloxClientTracker
@@ -150,15 +151,14 @@ namespace RobloxClientTracker
         {
             var info = new FileInfo(writePath);
             byte[] buffer = source.RawBuffer;
-            
+            writeFile(writePath, buffer, LogRbxm);
+
             if (source.IsCompiled)
             {
                 var rawSource = writePath.Replace(".luac", ".lua");
 
                 if (File.Exists(rawSource))
                     return;
-
-                writeFile(writePath, buffer, LogRbxm);
 
                 try
                 {
@@ -173,13 +173,14 @@ namespace RobloxClientTracker
             }
             else
             {
+                string src = Encoding.UTF8.GetString(buffer);
+                writeFile(writePath, buffer, LogRbxm);
+
                 var compiled = writePath + "c";
                 var disassembled = compiled + ".s";
 
-                if (!File.Exists(compiled))
-                    return;
-
-                File.Delete(compiled);
+                if (File.Exists(compiled))
+                    File.Delete(compiled);
 
                 if (!File.Exists(disassembled))
                     return;

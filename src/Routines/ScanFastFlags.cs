@@ -115,7 +115,7 @@ namespace RobloxClientTracker
             if (!Program.Conditions.Contains("noluaflags"))
             {
                 print("Scanning Lua flags...");
-                luaFlags = StudioFFlagDumper.DumpLuaFlags(extraContent);
+                luaFlags = StudioFFlagDumper.DumpLuaFlags(studioDir);
             }
 
             if (!Program.Conditions.Contains("nocppflags"))

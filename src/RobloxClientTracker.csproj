@@ -91,7 +91,6 @@
     <Compile Include="DataMiners\DataMiner.cs" />
     <Compile Include="DataMiners\MultiTaskMiner.cs" />
     <Compile Include="DataMiners\RobloxFileMiner.cs" />
-    <Compile Include="Exceptions\CppDumpException.cs" />
     <Compile Include="Luau\LuauByteCode.cs" />
     <Compile Include="Luau\LuauConst.cs" />
     <Compile Include="Luau\LuauDisassembly.cs" />
