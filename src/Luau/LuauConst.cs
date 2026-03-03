@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Diagnostics;
 using System.Linq;
+using System.Text;
 
 namespace RobloxClientTracker.Luau
 {
@@ -28,7 +29,56 @@ namespace RobloxClientTracker.Luau
                 }
                 case LuauConstType.STRING:
                 {
-                    result += $"\"{Value.ToString().Replace("\"", "\\\"")}\"";
+                    var value = Value.ToString();
+                    var builder = new StringBuilder();
+
+                    foreach (char c in value)
+                    {
+                        switch (c)
+                        {
+                            case '"':
+                            {
+                                builder.Append("\\\"");
+                                break;
+                            }
+                            case '\\':
+                            {
+                                builder.Append("\\\\");
+                                break;
+                            }
+                            case '\n':
+                            {
+                                builder.Append("\\n");
+                                break;
+                            }
+                            case '\r':
+                            {
+                                builder.Append("\\r");
+                                break;
+                            }
+                            case '\t':
+                            {
+                                builder.Append("\\t");
+                                break;
+                            }
+                            case '\0':
+                            {
+                                builder.Append("\\0");
+                                break;
+                            }
+                            default:
+                            {
+                                if (c < 32)
+                                    builder.AppendFormat("\\x{0:X}", c);
+                                else
+                                    builder.Append(c);
+
+                                break;
+                            }
+                        }
+                    }
+
+                    result = $"\"{builder}\"";
                     break;
                 }
                 case LuauConstType.TABLE:

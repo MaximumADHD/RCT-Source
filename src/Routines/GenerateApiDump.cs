@@ -18,9 +18,13 @@ namespace RobloxClientTracker
             string jsonFile = Path.Combine(stageDir, "Full-API-Dump.json");
             string json = File.ReadAllText(jsonFile);
 
-            var api = new ReflectionDatabase(jsonFile);
-            var dumper = new ReflectionDumper(api);
+            var jsonFile2 = Path.Combine(studioDir, "UNSTABLE___API-Dump-2.json");
+            var api = new ReflectionDatabase(jsonFile, ApiDumpSchema.V1_Full);
 
+            if (File.Exists(jsonFile2))
+                api.MungeV2(jsonFile2);
+
+            var dumper = new ReflectionDumper(api);
             string dump = dumper.DumpApi(ReflectionDumper.DumpUsingTxt);
             string exportPath = Path.Combine(stageDir, "API-Dump.txt");
 

@@ -65,6 +65,9 @@ namespace RobloxClientTracker
 
             foreach (string file in Directory.GetFiles(destFolder, "*.*", SearchOption.AllDirectories))
             {
+                if (!File.Exists(file))
+                    continue;
+
                 if (file.EndsWith(".rbxm", Program.InvariantString) || file.EndsWith(".rbxmx", Program.InvariantString))
                 {
                     print($"\t\tUnpacking {localPath(file)}");
@@ -86,24 +89,30 @@ namespace RobloxClientTracker
                 }
                 else if (file.EndsWith(".json", Program.InvariantString))
                 {
-                    string rawJson = File.ReadAllText(file);
+                    var fileInfo = new FileInfo(file);
+                    var fileDir = fileInfo.Directory;
 
-                    using (var reader = new StringReader(rawJson))
-                    using (var jsonReader = new JsonTextReader(reader))
+                    if (fileDir.Name.ToLowerInvariant() != "mini")
                     {
-                        var json = JObject.Load(jsonReader);
+                        string rawJson = File.ReadAllText(file);
 
-                        string minified = json.ToString(Formatting.None);
-                        string indented = json.ToString(Formatting.Indented);
+                        using (var reader = new StringReader(rawJson))
+                        using (var jsonReader = new JsonTextReader(reader))
+                        {
+                            var json = JObject.Load(jsonReader);
 
-                        var info = new FileInfo(file);
-                        string dir = info.DirectoryName;
+                            string minified = json.ToString(Formatting.None);
+                            string indented = json.ToString(Formatting.Indented);
 
-                        string minDir = createDirectory(dir, "mini");
-                        string minFile = Path.Combine(minDir, info.Name);
+                            var info = new FileInfo(file);
+                            string dir = info.DirectoryName;
 
-                        writeFile(file, indented);
-                        writeFile(minFile, minified);
+                            string minDir = createDirectory(dir, "mini");
+                            string minFile = Path.Combine(minDir, info.Name);
+
+                            writeFile(file, indented);
+                            writeFile(minFile, minified);
+                        }
                     }
                 }
             }

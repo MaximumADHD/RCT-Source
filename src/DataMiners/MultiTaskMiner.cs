@@ -20,18 +20,11 @@ namespace RobloxClientTracker
 
         public override void ExecuteRoutine()
         {
-            var tasks = new List<Task>();
+            var tasks = routines
+                .Select(routine => Task.Run(routine))
+                .ToArray();
 
-            foreach (Action routine in routines)
-            {
-                Task task = new Task(routine);
-                tasks.Add(task);
-            }
-
-            Parallel.ForEach(tasks, task => task.Start());
-
-            Task multiTask = Task.WhenAll(tasks);
-            multiTask.Wait();
+            Task.WaitAll(tasks);
         }
     }
 }

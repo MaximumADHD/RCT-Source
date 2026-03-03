@@ -50,7 +50,7 @@ namespace RobloxClientTracker
         private readonly ShaderFile[][] ShadersImpl;
 
         private readonly string[] BitNames;
-        private readonly byte[] Stub;
+        private readonly byte[] flag;
 
         public IReadOnlyList<string> Groups => GroupsImpl;
 
@@ -137,13 +137,34 @@ namespace RobloxClientTracker
                         ushort nameIndex = reader.ReadUInt16();
                         var nameInfo = names[nameIndex];
 
-                        shader.Stub = new ulong[4]
+                        ulong flagMask0 = reader.ReadUInt64();
+                        ulong flagReq0  = reader.ReadUInt64();
+
+                        ulong flagMask1 = reader.ReadUInt64();
+                        ulong flagReq1  = reader.ReadUInt64();
+
+                        shader.FFlagMasks = new Dictionary<string, ShaderFFlagMask>();
+
+                        void decodePair(ulong mask, ulong req)
                         {
-                            reader.ReadUInt64(),
-                            reader.ReadUInt64(),
-                            reader.ReadUInt64(),
-                            reader.ReadUInt64(),
-                        };
+                            for (int bit = 0; bit < fflags.Length; bit++)
+                            {
+                                if ((mask & (1UL << bit)) == 0)
+                                    continue;
+
+                                bool mustBeOn = (req & (1UL << bit)) != 0;
+                                var fflag = fflags[bit];
+
+                                shader.FFlagMasks[fflag] = new ShaderFFlagMask
+                                {
+                                    WhenEnabled = mustBeOn ? 1 : 0,
+                                    WhenDisabled = mustBeOn ? 0 : 1,
+                                };
+                            }
+                        }
+
+                        decodePair(flagMask0, flagReq0);
+                        decodePair(flagMask1, flagReq1);
 
                         var suffix = Convert.ToString(shader.Mask, 16).PadLeft(8, '0');
                         shader.Name = nameInfo.Name;

@@ -46,7 +46,13 @@ namespace RobloxClientTracker.Luau
     // Version 2: Adds Proto::linedefined. Supported until 0.544.
     // Version 3: Adds FORGPREP/JUMPXEQK* and enhances AUX encoding for FORGLOOP. Removes FORGLOOP_NEXT/INEXT and JUMPIFEQK/JUMPIFNOTEQK. Currently supported.
     // Version 4: Adds Proto::flags, typeinfo, and floor division opcodes IDIV/IDIVK. Currently supported.
-    // Version 5: Adds vector constants. Currently supported.
+    // Version 5: Adds SUBRK/DIVRK and vector constants. Currently supported.
+    // Version 6: Adds FASTCALL3. Currently supported.
+
+    // # Bytecode type information history
+    // Version 1: (from bytecode version 4) Type information for function signature. Currently supported.
+    // Version 2: (from bytecode version 4) Type information for arguments, upvalues, locals and some temporaries. Currently supported.
+    // Version 3: (from bytecode version 5) Type information for userdata type names and their index mapping. Currently supported.
 
     // Bytecode opcode, part of the instruction header
     public enum LuauOpcode
@@ -411,6 +417,9 @@ namespace RobloxClientTracker.Luau
         // B: source register
         // C: constant table index (0..255)
         IDIVK,
+
+        // Enum entry for number of opcodes, not a valid opcode by itself!
+        COUNT,
     };
 
     static class LuauInsn
@@ -429,6 +438,23 @@ namespace RobloxClientTracker.Luau
 
         // E encoding: one signed 24-bit value
         public static int E(uint insn) => ((int)insn) >> 8;
+
+        // Auxiliary AB: two 8-bit values, containing registers or small numbers
+        // Used in FASTCALL3
+        public static uint AUX_A(uint aux) => aux & 0xFF;
+        public static uint AUX_B(uint aux) => (aux >> 8) & 0xFF;
+
+        // Auxiliary KV: unsigned 24-bit constant index
+        // Used in JUMPXEQK* instructions
+        public static uint AUX_KV(uint aux) => aux & 0xFFFFFF;
+
+        // Auxiliary KB: 1-bit constant value
+        // Used in JUMPXEQKB instruction
+        public static uint AUX_KB(uint aux) => aux & 0x1;
+
+        // Auxiliary NOT: 1-bit negation flag
+        // Used in JUMPXEQK* instructions
+        public static uint AUX_NOT(uint aux) => aux >> 31;
 
         // Alias helpers
         public delegate uint U32(uint insn);
@@ -451,6 +477,30 @@ namespace RobloxClientTracker.Luau
 
             return set.ToArray();
         }
+    }
+
+    // Bytecode tags, used internally for bytecode encoded as a string
+    public enum LuauBytecodeTag
+    {
+        // Bytecode version; runtime supports [MIN, MAX], compiler emits TARGET by default but may emit a higher version when flags are enabled
+        VERSION_MIN = 3,
+        VERSION_MAX = 6,
+        VERSION_TARGET = 6,
+
+        // Type encoding version
+        TYPE_VERSION_MIN = 1,
+        TYPE_VERSION_MAX = 3,
+        TYPE_VERSION_TARGET = 3,
+
+        // Types of constant table entries
+        CONSTANT_NIL = 0,
+        CONSTANT_BOOLEAN,
+        CONSTANT_NUMBER,
+        CONSTANT_STRING,
+        CONSTANT_IMPORT,
+        CONSTANT_TABLE,
+        CONSTANT_CLOSURE,
+        CONSTANT_VECTOR,
     }
 
     // Constant Table Entries
@@ -481,6 +531,11 @@ namespace RobloxClientTracker.Luau
         BUFFER,
 
         ANY = 15,
+
+        TAGGED_USERDATA_BASE = 64,
+        TAGGED_USERDATA_END = 64 + 32,
+
+        OPTIONAL_BIT = 1 << 7,
         INVALID = 256,
     }
 
@@ -602,6 +657,30 @@ namespace RobloxClientTracker.Luau
         BUFFER_WRITEF32,
         BUFFER_READF64,
         BUFFER_WRITEF64,
+
+        // vector.
+        VECTOR_MAGNITUDE,
+        VECTOR_NORMALIZE,
+        VECTOR_CROSS,
+        VECTOR_DOT,
+        VECTOR_FLOOR,
+        VECTOR_CEIL,
+        VECTOR_ABS,
+        VECTOR_SIGN,
+        VECTOR_CLAMP,
+        VECTOR_MIN,
+        VECTOR_MAX,
+
+        // math.lerp
+        MATH_LERP,
+
+        // vector.lerp
+        VECTOR_LERP,
+
+        // math.
+        MATH_ISNAN,
+        MATH_ISINF,
+        MATH_ISFINITE,
     };
 
     public enum LuauCaptureType
@@ -621,5 +700,8 @@ namespace RobloxClientTracker.Luau
 
         // used to tag individual protos as not profitable to compile natively
         NATIVE_COLD = 1 << 1,
+
+        // used to tag main proto for modules that have at least one function with native attribute
+        NATIVE_FUNCTION = 1 << 2,
     }
 }

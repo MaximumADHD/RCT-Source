@@ -31,7 +31,6 @@ namespace RobloxClientTracker
         public ShaderType ShaderType { get; set; }
         public string Group { get; set; }
 
-        public ulong[] Stub { get; set; }
         public byte[] Buffer { get; set; }
 
         public int Mask { get; set; }
@@ -94,7 +93,7 @@ namespace RobloxClientTracker
 
                 Regex variables = new Regex("_([0-9]+)");
                 Regex structs = new Regex("struct ([A-z]+)\n{[^}]+};\n\n");
-                
+
                 foreach (var variable in variables.Matches(contents))
                 {
                     string str = variable

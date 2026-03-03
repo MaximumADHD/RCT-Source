@@ -19,7 +19,8 @@ namespace RobloxClientTracker
                 .Where(line => line.Length > 0)
                 .ToArray();
 
-            string csv = string.Join(",", headers);
+            var csv = new System.Text.StringBuilder();
+            csv.Append(string.Join(",", headers));
 
             for (int i = 0; i < lines.Length; i++)
             {
@@ -28,15 +29,11 @@ namespace RobloxClientTracker
                 if (i == 0 && line == "v0")
                     continue;
 
-                if (column++ % numColumns == 0)
-                    csv += '\n';
-                else
-                    csv += ',';
-
-                csv += line;
+                csv.Append(column++ % numColumns == 0 ? '\n' : ',');
+                csv.Append(line);
             }
 
-            return csv;
+            return csv.ToString();
         }
 
         public static string Convert(string file, params string[] headers)

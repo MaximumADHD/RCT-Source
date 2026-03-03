@@ -1,13 +1,16 @@
-﻿using System;
+﻿using Newtonsoft.Json.Linq;
+using RobloxClientTracker.Luau;
+using RobloxFiles;
+using RobloxFiles.BinaryFormat.Chunks;
+using RobloxFiles.DataTypes;
+using System;
+using System.Collections.Concurrent;
+using System.Collections.Generic;
+using System.Diagnostics;
+using System.Diagnostics.Contracts;
 using System.IO;
 using System.Linq;
-using System.Collections.Generic;
-using System.Diagnostics.Contracts;
-
-using RobloxFiles;
-using System.Diagnostics;
-using RobloxFiles.DataTypes;
-using RobloxClientTracker.Luau;
+using System.Security.Cryptography;
 using System.Text;
 #pragma warning disable IDE1006 // Naming Styles
 
@@ -20,28 +23,21 @@ namespace RobloxClientTracker
     /// </summary>
     public abstract class RobloxFileMiner : MultiTaskMiner
     {
+        public struct PackageRecord
+        {
+            public string Hash;
+            public string Name;
+            public string Content;
+            public string Version;
+        }
+
         private static Dictionary<string, string> modelManifest => state.ModelManifest;
-        public static Dictionary<string, Instance> Packages = new Dictionary<string, Instance>();
+        public static ConcurrentDictionary<string, ConcurrentDictionary<string, PackageRecord>> Packages = new ConcurrentDictionary<string, ConcurrentDictionary<string, PackageRecord>>();
 
         private static readonly FileLogConfig LogRbxm = new FileLogConfig()
         {
             Color = Program.DARK_CYAN,
             Stack = 3
-        };
-
-        // absolute last resort for stupid inconsistent package locations lol.
-        private static readonly List<string> KnownPackages = new List<string>()
-        {
-            "Cryo",
-            "React",
-            "Roact",
-            "Rodux",
-            "UIBlox",
-            "TestEZ",
-            "UILibrary",
-            "RoactRodux",
-            "ReactRoblox",
-            "DeveloperFramework",
         };
 
         protected static void copyDirectory(string source, string target)
@@ -133,18 +129,143 @@ namespace RobloxClientTracker
             Packages.Clear();
         }
 
-        private void recordPackage(Instance inst)
+        private static string getHash(string content)
         {
-            inst.Parent = null;
+            byte[] raw = Encoding.UTF8.GetBytes(content);
 
-            if (Packages.ContainsKey(inst.Name))
+            using (HashAlgorithm md5 = MD5.Create())
+            {
+                string hash = "";
+                var rawHash = md5.ComputeHash(raw);
+
+                foreach (byte b in rawHash)
+                    hash += b.ToString("x2");
+
+                return hash;
+            }
+        }
+
+        private void recordPackage(string name, Instance package, string version = null, string registry = null)
+        {
+            var contentMap = new Dictionary<string, string>();
+            package.Parent = null;
+
+            if (!Packages.TryGetValue(name, out var variants))
+            {
+                var newVariants = new ConcurrentDictionary<string, PackageRecord>();
+                Packages.TryAdd(name, newVariants);
+
+                variants = Packages[name];
+            }
+
+            // early out
+            if (version != null && variants.ContainsKey(version))
                 return;
 
-            var packageDir = createDirectory(stageDir, "CompiledPackages");
-            Packages.Add(inst.Name, inst);
+            foreach (var item in package.GetDescendants())
+            {
+                if (item is LuaSourceContainer lua)
+                {
+                    var path = item.GetFullName();
+                    ProtectedString source = null;
 
-            print($"Unpacking compiled package {inst.Name}...", ConsoleColor.Magenta);
-            unpackImpl(inst, packageDir, inst.Parent);
+                    if (lua is Script script)
+                    {
+                        path += (lua is LocalScript ? ".client" : ".server");
+                        source = script.Source;
+                    }
+                    else if (lua is ModuleScript module)
+                    {
+                        source = module.Source;
+                    }
+
+                    if (source != null)
+                    {
+                        string contents;
+                        path += ".lua";
+
+                        try
+                        {
+                            if (source.IsCompiled)
+                            {
+                                var data = source.RawBuffer;
+                                var disassembler = new LuauDisassembly(data);
+
+                                contents = disassembler.BuildDisassembly();
+                                path += "c";
+                            }
+                            else
+                            {
+                                contents = source.ToString();
+                            }
+
+                            contentMap.Add(path, contents);
+                        }
+                        catch (Exception e)
+                        {
+                            // TODO
+                            print(e.Message, ConsoleColor.Red);
+                        }
+                    }
+                }
+            }
+
+            var keys = contentMap.Keys.ToArray();
+            Array.Sort(keys, string.CompareOrdinal);
+
+            var contentBlob = new StringBuilder();
+            
+            foreach (var key in keys)
+            {
+                var value = contentMap[key];
+                value = getHash(value);
+
+                contentBlob.AppendLine($"[{key}]");
+                contentBlob.AppendLine(value);
+                contentBlob.AppendLine();
+            }
+
+            string content = contentBlob.ToString();
+            string hash = getHash(content);
+
+            // Unlikely to collide, but maybe once in a blue moon.
+            string id = version ?? hash.Substring(0, 8);
+
+            if (variants.ContainsKey(id))
+                return;
+
+            var compiledPackages = createDirectory(stageDir, "CompiledPackages");
+            var packageDir = createDirectory(compiledPackages, name);
+            
+            try
+            {
+                var record = new PackageRecord()
+                {
+                    Name = name,
+                    Hash = hash,
+                    Version = id,
+                    Content = content,
+                };
+
+                if (!variants.TryAdd(hash, record))
+                    return;
+
+                var children = package.GetChildren();
+
+                if (children.Length == 1)
+                {
+                    package = children[0];
+                    package.Parent = null;
+                }
+
+                package.Name = id;
+                print($"Unpacking CompiledPackage {record.Name} ({record.Hash}) (Version: {record.Version})", ConsoleColor.Magenta);
+                unpackImpl(package, packageDir, null);
+            }
+            catch
+            {
+                print(hash, ConsoleColor.Red);
+            }
         }
 
         private void writeScript(string writePath, ProtectedString source)
@@ -166,9 +287,9 @@ namespace RobloxClientTracker
                     string disassembly = disassembler.BuildDisassembly();
                     writeFile(writePath + ".s", disassembly, LogRbxm);
                 }
-                catch
+                catch (Exception e)
                 {
-                    print("\t\t!!FIXME: Error writing diassembly for " + writePath, ConsoleColor.Red);
+                    print("\t\t!!FIXME: Error writing disassembly for " + writePath + ": " + e.Message, ConsoleColor.Red);
                 }
             }
             else
@@ -195,95 +316,79 @@ namespace RobloxClientTracker
                 return;
 
             string name = inst.Name;
-            var packageBin = inst.Parent;
+            var parent = inst.Parent;
 
             var children = inst
                 .GetChildren()
                 .ToList();
 
-            if (KnownPackages.Contains(name) && children.Count > 0)
+            if (name.ToLowerInvariant() == "packages")
             {
-                recordPackage(inst);
-                return;
-            }
-            else if (name == "_Index")
-            {
-                // Probably a package managed by Rotriever.
-                if (packageBin != null)
+                var index = inst.FindFirstChild("_Index");
+                var dev = inst.FindFirstChild("Dev");
+
+                //-----------------------------------------------------------------------
+                // Each package folder is setup as such:
+                // Packages [Folder]
+                //   _Index [Folder]
+                //     TheModule-MaybeHash-MaybeVersion [Folder]
+                //       TheModule [ModuleScript] (REAL MODULE)
+                //       Dependency1 [ModuleScript] (LINK TO _INDEX DEPENDENCY)
+                //       Dependency2 [ModuleScript] (LINK TO _INDEX DEPENDENCY)
+                //
+                //   Dev [Folder]
+                //     DevModule [ModuleScript] (LINK TO _INDEX DEPENDENCY)
+                //
+                //   TheModule [ModuleScript] (LINK TO "REAL MODULE" _INDEX DEPENDENCY)
+                //-----------------------------------------------------------------------
+
+                // What we want to do is:
+                // * Grab all of the packages that have been indexed.
+                // * Hash the contents of those packages in a deterministic way.
+                // * Index all of these hashes into named buckets.
+
+                if (index != null)
                 {
-                    var set = packageBin.GetChildren();
-
-                    foreach (var child in set)
+                    foreach (var pkgIndex in index.GetChildren())
                     {
-                        // Ignore _Index
-                        if (child == inst)
-                            continue;
+                        string packageId = pkgIndex.Name;
 
-                        // Ignore test bindings
-                        if (child.Name == "Dev")
-                            continue;
-
-                        // Ignore package links.
-                        if (!child.GetChildren().Any())
-                            continue;
-
-                        // This isn't a rotriever package, but it's probably reused.
-                        children.Remove(child);
-                        recordPackage(child);
-                    }
-                }
-
-                foreach (var child in children)
-                {
-                    var packageName = child.Name
-                        .Split('_')
-                        .Last();
-                    
-                    LuaSourceContainer package = null;
-                    var target = child;
-
-                    if (name == "_IndexLegacy" || name == "_Legacy")
-                        target = child.FindFirstChild("Packages");
-
-                    if (target == null)
-                        continue;
-                    
-                    foreach (var module in target.GetChildren())
-                    {
-                        if (!packageName.StartsWith(module.Name))
-                            continue;
-
-                        if (module is LuaSourceContainer luaModule)
+                        if (!packageId.Contains("@"))
                         {
-                            package = luaModule;
-                            break;
+                            // Rotriever package
+                            var schema = packageId.Split('-');
+                            var pkgName = schema[0];
+
+                            var pkgVersion = schema.Length > 2 ? schema[2] : null;
+                            var pkgRegistry = schema.Length > 2 ? schema[1] : null;
+
+                            var pkgInst = pkgIndex.FindFirstChild(pkgName);
+                            recordPackage(pkgName, pkgIndex, pkgVersion, pkgRegistry);
+                        }
+                        else
+                        {
+                            // Wally package
+                            var underscore = packageId.IndexOf("_");
+                            var atSign = packageId.IndexOf("@");
+
+                            if (underscore >= 0 && atSign >= 0)
+                            {
+                                var pkgName = packageId.Substring(underscore + 1, atSign - 1);
+                                var version = packageId.Substring(atSign + 1);
+                                recordPackage(pkgName, pkgIndex, version);
+                            }
                         }
                     }
 
-                    if (package == null)
-                        continue;
-
-                    recordPackage(child);
+                    index.Parent = null;
                 }
-
-                children.Clear();
             }
 
             string instDir = resetDirectory(parentDir, name);
-            var indexHack = inst.FindFirstChild("_Index");
-
             string extension = "";
             string value = "";
 
-            if (indexHack != null)
-            {
-                children.Remove(indexHack);
-                children.Insert(0, indexHack);
-            }
-
-            if (inst.Parent != packageBin)
-                return;
-            else if (children.Count > 0)
+            if (children.Count > 0)
                 children.ForEach(child => unpackImpl(child, instDir, inst));
             else if (Directory.Exists(instDir))
                 Directory.Delete(instDir);

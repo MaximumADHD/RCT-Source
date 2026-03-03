@@ -62,7 +62,6 @@ namespace RobloxClientTracker
         private PeFile exe;
 
         private int segmentSize;
-        private static readonly object undecorate = new object();
 
         private long rvaToFileOffset(uint rva)
         {
@@ -99,7 +98,7 @@ namespace RobloxClientTracker
             rawStudioExe = File.ReadAllBytes(studioPath);
             exe = new PeFile(rawStudioExe);
 
-            studioExe = Encoding.UTF8.GetString(rawStudioExe); // PROBABLY UNSAFE??
+            studioExe = Encoding.GetEncoding(1252).GetString(rawStudioExe);
             segmentSize = studioExe.Length / maxThreads;
 
             // Now execute the routines.
@@ -133,7 +132,7 @@ namespace RobloxClientTracker
                     continue;
 
                 string firstChar = matchStr.Substring(0, 1);
-                Match sanitize = Regex.Match(firstChar, "^[A-z_%*'-]");
+                Match sanitize = Regex.Match(firstChar, "^[A-Za-z_%*'-]");
 
                 if (sanitize.Length == 0)
                     continue;
@@ -166,7 +165,7 @@ namespace RobloxClientTracker
             Parallel.For(0, maxThreads, i =>
             {
                 var segment = getSegment(i);
-                var matches = Regex.Matches(segment, "([A-Z][A-z][A-z_0-9.]{8,256})+[A-z0-9]?");
+                var matches = Regex.Matches(segment, "([A-Z][A-Za-z][A-Za-z_0-9.]{8,256})+[A-Za-z0-9]?");
 
                 var set = matches.Cast<Match>()
                     .Select(match => match.Value)
@@ -188,55 +187,61 @@ namespace RobloxClientTracker
         private void extractCppTypes()
         {
             print("Extracting CPP types...");
-            var lines = new ConcurrentBag<string>();
+
+            // Parallel phase: regex matching only — no UnDecorateSymbolName here
+            var rawSymbols = new ConcurrentBag<string>();
 
             Parallel.For(0, maxThreads, i =>
             {
                 var segment = getSegment(i);
-                var classes = hackOutPattern(segment, "(AV|AW4)[A-z0-9_@\\?\\$]+");
+                var classes = hackOutPattern(segment, "(AV|AW4)[A-Za-z0-9_@\\?\\$]+");
 
                 foreach (string symbol in classes)
                 {
                     string data = '?' + symbol;
 
                     if (data.ToUpperInvariant().EndsWith("@@", Program.InvariantString))
-                    {
-                        var output = new StringBuilder(8192);
-
-                        lock (undecorate)
-                            UnDecorateSymbolName(data, output, 8192, UnDecorateFlags.UNDNAME_NO_ARGUMENTS);
-
-                        string result = output.ToString();
-
-                        if (result == data)
-                            continue;
-
-                        foreach (string complex in TypeSimplify.Keys)
-                        {
-                            string simple = TypeSimplify[complex];
-                            result = result.Replace(complex, simple);
-                        }
-
-                        if (result.Length < 6)
-                            continue;
-
-                        lines.Add(result.Substring(6));
-                    }
+                        rawSymbols.Add(data);
                 }
             });
-            
+
+            // Serial phase: UnDecorateSymbolName is not thread-safe, so process after parallel work
+            var lines = new List<string>();
+            var output = new StringBuilder(8192);
+
+            foreach (string data in rawSymbols.Distinct())
+            {
+                output.Clear();
+                UnDecorateSymbolName(data, output, 8192, UnDecorateFlags.UNDNAME_NO_ARGUMENTS);
+
+                string result = output.ToString();
+
+                if (result == data)
+                    continue;
+
+                foreach (string complex in TypeSimplify.Keys)
+                {
+                    string simple = TypeSimplify[complex];
+                    result = result.Replace(complex, simple);
+                }
+
+                if (result.Length < 6)
+                    continue;
+
+                lines.Add(result.Substring(6));
+            }
+
             string cppTree = string.Join("\r\n", lines
                 .OrderBy(line => line)
                 .Distinct());
-            
+
             string cppTreePath = Path.Combine(stageDir, "CppTree.txt");
             writeFile(cppTreePath, cppTree);
         }
 
-
         private void extractLuauTypes()
         {
-            // Fetch the static inections first.
+            // Fetch the static injections first.
             var entryPoint = studioExe.IndexOf("declare function wait");
 
             if (entryPoint < 0)

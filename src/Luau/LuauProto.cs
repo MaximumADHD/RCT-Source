@@ -29,9 +29,9 @@ namespace RobloxClientTracker.Luau
         private static string JUMP(int result)
         {
             if (result > 0)
-                return $"[+{result}]";
+                return $"; [+{result}]";
 
-            return $"[{result}]";
+            return $"; [{result}]";
         }
 
         private static string JUMP(Func<int> value)
@@ -46,7 +46,10 @@ namespace RobloxClientTracker.Luau
 
         public string CONST(uint id)
         {
-            return $"K{id} [{Consts[id]}]";
+            if (id >= 0 && id < Consts.Length)
+                return $"K{id} [{Consts[id]}]";
+
+            return $"K{id} [NULL]";
         }
 
         public string CONST(int id)
@@ -83,6 +86,12 @@ namespace RobloxClientTracker.Luau
                 Func<int> D = () => LuauInsn.D(insn);
                 Func<int> E = () => LuauInsn.E(insn);
 
+                Func<uint> AUX_A = () => LuauInsn.AUX_A(AUX);
+                Func<uint> AUX_B = () => LuauInsn.AUX_B(AUX);
+                Func<uint> AUX_KV = () => LuauInsn.AUX_KV(AUX);
+                Func<uint> AUX_KB = () => LuauInsn.AUX_KB(AUX);
+                Func<uint> AUX_NOT = () => LuauInsn.AUX_NOT(AUX);
+
                 for (int code = 0; code < len; code++)
                 {
                     insn = Code[code];
@@ -92,7 +101,7 @@ namespace RobloxClientTracker.Luau
                         AUX = Code[code + 1];
 
                     var op = LuauInsn.OP(insn);
-                    string line = $"{op} ";
+                    var line = string.Format("  {0,5} {1,-32} ", code, op);
 
                     switch (op)
                     {
@@ -338,21 +347,22 @@ namespace RobloxClientTracker.Luau
                         }
                         case LuauOpcode.FASTCALL3:
                         {
-                            line += $"{(LuauBuiltinFunction)A()} R{B()} R{AUX & 0xFF} R{(AUX >> 8) & 0xFF}";
+                            line += $"{(LuauBuiltinFunction)A()} R{B()} R{AUX_A()} R{AUX_B()}";
                             code++; // AUX
                             break;
                         }
                         case LuauOpcode.JUMPXEQKB:
                         case LuauOpcode.JUMPXEQKNIL:
                         {
-                            var expect = (AUX & 1) > 0;
-                            var not = (AUX >> 31) > 0;
-                            string flag = "";
+                            var expect = AUX_KB() > 0;
+                            var not = AUX_NOT() > 0;
+                            var flag = "";
 
                             if (op == LuauOpcode.JUMPXEQKB)
                                 flag = expect ? "TRUE " : "FALSE ";
 
-                            line = line.Replace("X", not ? "IFNOT" : "IF");
+                            var opName = op.ToString().Replace("X", not ? "IFNOT" : "IF");
+                            line = string.Format("  {0,5} {1,-32} ", code, opName);
                             line += $"R{A()} {flag}{JUMP(D)}";
 
                             code++; // AUX
@@ -361,10 +371,11 @@ namespace RobloxClientTracker.Luau
                         case LuauOpcode.JUMPXEQKN:
                         case LuauOpcode.JUMPXEQKS:
                         {
-                            var index = AUX & 0xffffff;
-                            var not = (AUX >> 31) > 0;
+                            var index = LuauInsn.AUX_KV(AUX);
+                            var not = LuauInsn.AUX_NOT(AUX) > 0;
 
-                            line = line.Replace("X", not ? "IFNOT" : "IF");
+                            var opName = op.ToString().Replace("X", not ? "IFNOT" : "IF");
+                            line = string.Format("  {0,5} {1,-32} ", code, opName);
                             line += $"R{A()} {CONST(index)} {JUMP(D)}";
 
                             code++; // AUX
@@ -377,7 +388,7 @@ namespace RobloxClientTracker.Luau
                         }
                     }
 
-                    lines.Add(line.Trim());
+                    lines.Add(line);
                 }
 
                 return lines;
