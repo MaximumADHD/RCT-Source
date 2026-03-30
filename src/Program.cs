@@ -43,7 +43,6 @@ namespace RobloxClientTracker
 
         const string ARG_BRANCH = "-branch";
         const string ARG_PARENT = "-parent";
-        const string ARG_CHANNEL = "-channel";
         const string ARG_TRACK_MODE = "-trackMode";
         const string ARG_POST_SCRIPT = "-postScript";
         const string ARG_MANUAL_BUILD = "-manualBuild";
@@ -178,7 +177,6 @@ namespace RobloxClientTracker
 
         public static string branch = "roblox";
         public static string parent = "roblox";
-        public static Channel channel = "LIVE";
         public static string postScript = "";
 
         public static string trunk { get; private set; }
@@ -457,7 +455,6 @@ namespace RobloxClientTracker
 
             studio = new StudioBootstrapper(state)
             {
-                Channel = channel,
                 GenerateMetadata = true,
                 CanShutdownStudio = false,
                 ForceInstall = FORCE_INSTALL,
@@ -568,20 +565,23 @@ namespace RobloxClientTracker
                 }
 
                 // Check for updates to the version
-                ClientVersionInfo info = await StudioBootstrapper.GetCurrentVersionInfo(channel, state.VersionData);
+                ClientVersionInfo info = await StudioBootstrapper.GetCurrentVersionInfo(state.VersionData);
                 
                 if (!string.IsNullOrEmpty(FORCE_VERSION_ID))
-                    info = new ClientVersionInfo(channel, FORCE_VERSION_ID, info.VersionGuid);
+                    info = new ClientVersionInfo(FORCE_VERSION_ID, info.VersionGuid);
 
                 if (!string.IsNullOrEmpty(FORCE_VERSION_GUID))
-                    info = new ClientVersionInfo(channel, info.Version, FORCE_VERSION_GUID);
+                    info = new ClientVersionInfo(info.Version, FORCE_VERSION_GUID);
 
                 if (FORCE_UPDATE || MANUAL_BUILD || info.VersionGuid != state.Version)
                 {
                     // Make sure Roblox Studio is up to date for this build.
                     print("Update detected!", YELLOW);
                     git("pull");
-                    
+
+                    if (FORCE_VERSION_GUID != null)
+                        studio.OverrideGuid = FORCE_VERSION_GUID;
+
                     if (!MANUAL_BUILD)
                     {
                         print("Syncing Roblox Studio...", GREEN);
@@ -1115,9 +1115,6 @@ namespace RobloxClientTracker
             if (argMap.ContainsKey(ARG_BRANCH))
                 branch = argMap[ARG_BRANCH];
 
-            if (argMap.ContainsKey(ARG_CHANNEL))
-                channel = argMap[ARG_CHANNEL];
-
             if (argMap.ContainsKey(ARG_PARENT))
                 parent = argMap[ARG_PARENT];
 
@@ -1177,37 +1174,6 @@ namespace RobloxClientTracker
                 Conditions = argMap[ARG_CONDITIONS].ToLowerInvariant().Split(',', ';', '+');
 
             #endregion
-
-            if (TRACK_MODE == TrackMode.Client && !argMap.ContainsKey(ARG_BRANCH))
-            {
-                switch (channel.Name)
-                {
-                    case "live":
-                    {
-                        // Nothing to change.
-                        break;
-                    }
-                    case "zcanary":
-                    {
-                        branch = "zCanary";
-                        break;
-                    }
-
-                    case "zintegration":
-                    {
-                        branch = "zIntegration";
-                        parent = "zCanary";
-                        break;
-                    }
-
-                    default:
-                    {
-                        branch = channel.Name;
-                        parent = "zIntegration";
-                        break;
-                    }
-                }
-            }
 
             trunk = createDirectory(@"C:\Roblox-Client-Tracker");
             stageDir = createDirectory(trunk, "stage", branch);

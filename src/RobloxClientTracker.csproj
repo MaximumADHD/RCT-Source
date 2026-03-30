@@ -106,6 +106,7 @@
       <DesignTimeSharedInput>True</DesignTimeSharedInput>
       <DependentUpon>Settings.settings</DependentUpon>
     </Compile>
+    <Compile Include="Routines\AppendToHistory.cs" />
     <Compile Include="Routines\ConvertManifestsToCsv.cs" />
     <Compile Include="Routines\CopyContentFolders.cs" />
     <Compile Include="Routines\ExtractQtResources.cs" />
