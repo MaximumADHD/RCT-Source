@@ -17,9 +17,14 @@ namespace RobloxClientTracker
             var historyPath = Path.Combine(stageDir, "version-history.json");
             var jsonHistory = File.ReadAllText(historyPath);
 
+            var versionPath = Path.Combine(stageDir, "version.txt");
+            var version = File.ReadAllText(versionPath);
 
-            print("Updating version history...");
-            var append = StudioDeployLogs.AppendToHistoryLedger(jsonHistory);
+            var guidPath = Path.Combine(stageDir, "version-guid.txt");
+            var guid = File.ReadAllText(guidPath);
+
+            print($"Updating version history... ({version} = {guid})");
+            var append = StudioDeployLogs.AppendToHistoryLedger(jsonHistory, version, guid);
 
             append.Wait();
             jsonHistory = append.Result;

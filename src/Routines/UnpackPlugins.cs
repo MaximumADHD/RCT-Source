@@ -35,8 +35,6 @@ namespace RobloxClientTracker
                             unpackFile(file, true);
                             return;
                         }
-
-                        File.Delete(file);
                     });
                 }
             }
