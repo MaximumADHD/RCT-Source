@@ -126,13 +126,15 @@ namespace RobloxClientTracker
                         var shader = new ShaderFile
                         {
                             Hash = hash,
-                            Offset = reader.ReadInt32(),
-                            Size = reader.ReadInt32(),
-                        };
+                            Offset = reader.ReadUInt32(),
+                            Size = reader.ReadUInt32(),
 
-                        shader.Mask = reader.ReadInt32();
-                        shader.ShaderType = (ShaderType)reader.ReadByte();
-                        shader.Group = Groups[reader.ReadByte()];
+                            Mask = reader.ReadUInt32(),
+                            ShaderType = (ShaderType)reader.ReadByte(),
+                            Group = Groups[reader.ReadByte()],
+
+                            FFlagMasks = new Dictionary<string, ShaderFFlagMask>(),
+                        };
 
                         ushort nameIndex = reader.ReadUInt16();
                         var nameInfo = names[nameIndex];
@@ -142,8 +144,6 @@ namespace RobloxClientTracker
 
                         ulong flagMask1 = reader.ReadUInt64();
                         ulong flagReq1  = reader.ReadUInt64();
-
-                        shader.FFlagMasks = new Dictionary<string, ShaderFFlagMask>();
 
                         void decodePair(ulong mask, ulong req)
                         {
@@ -183,7 +183,7 @@ namespace RobloxClientTracker
                 foreach (ShaderFile shader in Shaders)
                 {
                     file.Position = shader.Offset;
-                    shader.Buffer = reader.ReadBytes(shader.Size);
+                    shader.Buffer = reader.ReadBytes(checked((int)shader.Size));
                 }
             }
         }

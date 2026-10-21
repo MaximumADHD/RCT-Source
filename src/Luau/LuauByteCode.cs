@@ -1,5 +1,4 @@
-﻿using RobloxFiles.DataTypes;
-using System;
+﻿using System;
 using System.Collections.Generic;
 
 namespace RobloxClientTracker.Luau
@@ -48,6 +47,11 @@ namespace RobloxClientTracker.Luau
     // Version 4: Adds Proto::flags, typeinfo, and floor division opcodes IDIV/IDIVK. Currently supported.
     // Version 5: Adds SUBRK/DIVRK and vector constants. Currently supported.
     // Version 6: Adds FASTCALL3. Currently supported.
+    // Version 7: Adds LBC_CONSTANT_TABLE_WITH_CONSTANTS for DUPTABLE with pre-filled constant values. Currently supported.
+    // Version 8: Adds LBC_CONSTANT_INTEGER for 64-bit integer constants. Currently supported.
+    // Version 9: Adds atom-based userdata field access acceleration. Currently supported.
+    // Version 10: Adds LBC_CONSTANT_CLASS_SHAPE and NEWCLASSMEMBER for use with Luau Classes. Experimental.
+    // Version 11: Adds CALLFB, CMPPROTO and feedback vector description. Experimental.
 
     // # Bytecode type information history
     // Version 1: (from bytecode version 4) Type information for function signature. Currently supported.
@@ -418,6 +422,33 @@ namespace RobloxClientTracker.Luau
         // C: constant table index (0..255)
         IDIVK,
 
+        // Atom-based userdata field access acceleration
+        // These are equivalent to their GETTABLEKS/SETTABLEKS/NAMECALL counterparts, except tailored towards userdata field accesses
+        // If the user has registered metamethods for a userdata tag, callbacks will be called by these instructions
+        GETUDATAKS,
+        SETUDATAKS,
+        NAMECALLUDATA,
+
+        // NEWCLASSMEMBER: register this method on a class object.
+        // A: target register of class
+        // B: reserved
+        // C: initial value of this member. currently must be a function.
+        // AUX: The name of this member as a constant string
+        NEWCLASSMEMBER,
+
+        // CALLFB: call specified function with collecting runtime stats in a feedback slot
+        // A: register where the function object lives, followed by arguments; results are placed starting from the same register
+        // B: argument count + 1, or 0 to preserve all arguments up to top (MULTRET)
+        // C: result count + 1, or 0 to preserve all values and adjust top (MULTRET)
+        // AUX: feedback slot id. 0xFFFFFFFF - sealed
+        CALLFB,
+
+        // CMPPROTO: check if a register contains a closure with a specified Luau function proto id
+        // A: closure register
+        // D: jump offset if proto doesn't match
+        // AUX: proto id
+        CMPPROTO,
+
         // Enum entry for number of opcodes, not a valid opcode by itself!
         COUNT,
     };
@@ -456,6 +487,14 @@ namespace RobloxClientTracker.Luau
         // Used in JUMPXEQK* instructions
         public static uint AUX_NOT(uint aux) => aux >> 31;
 
+        // Auxiliary 16-bit constant index and 16-bit cachedslot
+        // Used in GETUDATAKS, SETUDATAKS and NAMECALLUDATA
+        public static uint AUX_KV16(uint aux) => aux & 0xFFFFu;
+        public static uint AUX_SLOT(uint aux) => aux >> 16;
+
+        // Sealed feedback slot id sentinel, used by CALLFB
+        public const uint FBSLOT_SEALED = 0xFFFFFFFF;
+
         // Alias helpers
         public delegate uint U32(uint insn);
         public delegate int I32(uint insn);
@@ -484,7 +523,7 @@ namespace RobloxClientTracker.Luau
     {
         // Bytecode version; runtime supports [MIN, MAX], compiler emits TARGET by default but may emit a higher version when flags are enabled
         VERSION_MIN = 3,
-        VERSION_MAX = 6,
+        VERSION_MAX = 11,
         VERSION_TARGET = 6,
 
         // Type encoding version
@@ -501,6 +540,9 @@ namespace RobloxClientTracker.Luau
         CONSTANT_TABLE,
         CONSTANT_CLOSURE,
         CONSTANT_VECTOR,
+        CONSTANT_TABLE_WITH_CONSTANTS,
+        CONSTANT_INTEGER,
+        CONSTANT_CLASS_SHAPE,
     }
 
     // Constant Table Entries
@@ -513,7 +555,10 @@ namespace RobloxClientTracker.Luau
         IMPORT,
         TABLE,
         CLOSURE,
-        VECTOR
+        VECTOR,
+        TABLE_WITH_CONSTANTS,
+        INTEGER,
+        CLASS_SHAPE,
     }
 
     // Type table tags
@@ -529,6 +574,7 @@ namespace RobloxClientTracker.Luau
         USERDATA,
         VECTOR,
         BUFFER,
+        INTEGER,
 
         ANY = 15,
 
@@ -681,6 +727,49 @@ namespace RobloxClientTracker.Luau
         MATH_ISNAN,
         MATH_ISINF,
         MATH_ISFINITE,
+
+        // integer
+        INTEGER_CREATE,
+        INTEGER_TONUMBER,
+        INTEGER_NEG,
+        INTEGER_ADD,
+        INTEGER_SUB,
+        INTEGER_MUL,
+        INTEGER_DIV,
+        INTEGER_MIN,
+        INTEGER_MAX,
+        INTEGER_REM,
+        INTEGER_IDIV,
+        INTEGER_UDIV,
+        INTEGER_UREM,
+        INTEGER_MOD,
+        INTEGER_CLAMP,
+        INTEGER_BAND,
+        INTEGER_BOR,
+        INTEGER_BNOT,
+        INTEGER_BXOR,
+        INTEGER_LT,
+        INTEGER_LE,
+        INTEGER_ULT,
+        INTEGER_ULE,
+        INTEGER_GT,
+        INTEGER_GE,
+        INTEGER_UGT,
+        INTEGER_UGE,
+        INTEGER_LSHIFT,
+        INTEGER_RSHIFT,
+        INTEGER_ARSHIFT,
+        INTEGER_LROTATE,
+        INTEGER_RROTATE,
+        INTEGER_EXTRACT,
+        INTEGER_BTEST,
+        INTEGER_COUNTRZ,
+        INTEGER_COUNTLZ,
+        INTEGER_BSWAP,
+
+        // buffer.readinteger / buffer.writeinteger (int64_t)
+        BUFFER_READINTEGER,
+        BUFFER_WRITEINTEGER,
     };
 
     public enum LuauCaptureType
@@ -703,5 +792,13 @@ namespace RobloxClientTracker.Luau
 
         // used to tag main proto for modules that have at least one function with native attribute
         NATIVE_FUNCTION = 1 << 2,
+
+        // function can be inlined
+        INLINABLE = 1 << 3,
+    }
+
+    public enum LuauFeedbackType
+    {
+        CALLTARGET = 0,
     }
 }

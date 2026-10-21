@@ -25,15 +25,15 @@ namespace RobloxClientTracker
         public string Name { get; set; }
         public string Hash { get; set; }
 
-        public int Offset { get; set; }
-        public int Size { get; set; }
+        public uint Offset { get; set; }
+        public uint Size { get; set; }
 
         public ShaderType ShaderType { get; set; }
         public string Group { get; set; }
 
         public byte[] Buffer { get; set; }
 
-        public int Mask { get; set; }
+        public uint Mask { get; set; }
         public Dictionary<string, ShaderFFlagMask> FFlagMasks { get; set; }
 
         public string Id
@@ -67,7 +67,7 @@ namespace RobloxClientTracker
                 var other = obj as ShaderFile;
 
                 if (Name == other.Name && Mask != other.Mask)
-                    return Mask - other.Mask;
+                    return Mask.CompareTo(other.Mask);
 
                 return string.Compare(Id, other.Id, Program.InvariantString);
             }

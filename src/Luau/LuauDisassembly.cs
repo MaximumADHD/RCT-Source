@@ -13,6 +13,13 @@ namespace RobloxClientTracker.Luau
         public byte Register;
     }
 
+    public class LuauClassShape
+    {
+        public int ClassName;
+        public int[] PropertyNames;
+        public int[] MethodNames;
+    }
+
     public class LuauDisassembly
     {
         public readonly string[] Strings;
@@ -42,6 +49,22 @@ namespace RobloxClientTracker.Luau
                 return result;
             };
 
+            Func<ulong> readVarInt64 = () =>
+            {
+                ulong result = 0;
+                int shift = 0;
+                byte b;
+
+                do
+                {
+                    b = reader.ReadByte();
+                    result |= (ulong)(b & 127) << shift;
+                    shift += 7;
+                } while ((b & 128) > 0);
+
+                return result;
+            };
+
             Func<string> readString = () =>
             {
                 int id = readVarInt();
@@ -52,8 +75,8 @@ namespace RobloxClientTracker.Luau
 
             if (version == 0)
                 throw new Exception("Ill-formatted Luau.");
-            else if (version < 3 || version > 6)
-                throw new Exception($"Bytecode version mismatch (expected [3..6], got {version})");
+            else if (version < 3 || version > 11)
+                throw new Exception($"Bytecode version mismatch (expected [3..11], got {version})");
 
             var typesVersion = 0;
 
@@ -72,11 +95,12 @@ namespace RobloxClientTracker.Luau
 
             if (typesVersion == 3)
             {
+                // userdata type name mapping: pairs of (1-based index, name string-table varint), terminated by 0
                 byte index = reader.ReadByte();
 
                 while (index != 0)
                 {
-                    // do nothing... for now.
+                    readVarInt(); // name reference into string table
                     index = reader.ReadByte();
                 }
             }
@@ -87,6 +111,7 @@ namespace RobloxClientTracker.Luau
             for (var i = 0; i < protoCount; i++)
             {
                 var proto = new LuauProto();
+                proto.Parent = this;
                 proto.MaxStackSize = reader.ReadByte();
                 proto.NumParams = reader.ReadByte();
                 proto.NumUpvalues = reader.ReadByte();
@@ -95,11 +120,11 @@ namespace RobloxClientTracker.Luau
                 if (version >= 4)
                 {
                     proto.Flags = (LuauProtoFlags)reader.ReadByte();
-                    
+
                     if (typesVersion == 1)
                     {
                         var typeSize = readVarInt();
-                        
+
                         if (typeSize > 0)
                         {
                             var headerSize = typeSize > 127 ? 4 : 3;
@@ -205,6 +230,53 @@ namespace RobloxClientTracker.Luau
 
                             break;
                         }
+                        case LuauConstType.TABLE_WITH_CONSTANTS:
+                        {
+                            // Pairs of (key varint, value constant index as raw int32).
+                            int size = readVarInt();
+                            var tbl = new int[size * 2];
+
+                            for (int k = 0; k < size; k++)
+                            {
+                                tbl[k * 2] = readVarInt();
+                                tbl[k * 2 + 1] = reader.ReadInt32();
+                            }
+
+                            constant.Value = tbl;
+                            break;
+                        }
+                        case LuauConstType.INTEGER:
+                        {
+                            // sign byte followed by varint absolute value; negative is encoded as ~v + 1
+                            byte sign = reader.ReadByte();
+                            ulong mag = readVarInt64();
+                            long value = sign != 0 ? -(long)mag : (long)mag;
+                            constant.Value = value;
+                            break;
+                        }
+                        case LuauConstType.CLASS_SHAPE:
+                        {
+                            // className varint, propertyNames count varint, methodNames count varint, then names
+                            int className = readVarInt();
+                            int propCount = readVarInt();
+                            int methodCount = readVarInt();
+
+                            var props = new int[propCount];
+                            for (int k = 0; k < propCount; k++)
+                                props[k] = readVarInt();
+
+                            var methods = new int[methodCount];
+                            for (int k = 0; k < methodCount; k++)
+                                methods[k] = readVarInt();
+
+                            constant.Value = new LuauClassShape
+                            {
+                                ClassName = className,
+                                PropertyNames = props,
+                                MethodNames = methods,
+                            };
+                            break;
+                        }
                         default:
                         {
                             Debug.Assert(false, $"Unexpected constant kind {constant.Type}");
@@ -272,11 +344,12 @@ namespace RobloxClientTracker.Luau
 
                     for (int j = 0; j < numLocVars; j++)
                     {
-                        var locvar = proto.LocVars[j];
+                        var locvar = new LuauLocVar();
                         locvar.VarName = readString();
                         locvar.StartPoint = readVarInt();
                         locvar.EndPoint = readVarInt();
                         locvar.Register = reader.ReadByte();
+                        proto.LocVars[j] = locvar;
                     }
 
                     var sizeUpvalues = readVarInt();
@@ -286,6 +359,18 @@ namespace RobloxClientTracker.Luau
                     {
                         string str = readString();
                         proto.Upvalues[j] = str;
+                    }
+                }
+
+                // Feedback slots (LuauEmitCallFeedback, bytecode version >= 11)
+                if (version >= 11)
+                {
+                    int fbCount = readVarInt();
+
+                    for (int j = 0; j < fbCount; j++)
+                    {
+                        reader.ReadByte(); // LuauFeedbackType (currently only CALLTARGET = 0)
+                        readVarInt();      // pc of the feedback instruction
                     }
                 }
 

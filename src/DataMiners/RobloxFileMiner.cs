@@ -33,6 +33,7 @@ namespace RobloxClientTracker
 
         private static Dictionary<string, string> modelManifest => state.ModelManifest;
         public static ConcurrentDictionary<string, ConcurrentDictionary<string, PackageRecord>> Packages = new ConcurrentDictionary<string, ConcurrentDictionary<string, PackageRecord>>();
+        private static readonly ConcurrentDictionary<string, Lazy<string>> disassemblies = new ConcurrentDictionary<string, Lazy<string>>();
 
         private static readonly FileLogConfig LogRbxm = new FileLogConfig()
         {
@@ -127,6 +128,18 @@ namespace RobloxClientTracker
         {
             resetDirectory(stageDir, "CompiledPackages");
             Packages.Clear();
+            disassemblies.Clear();
+        }
+
+        private static string getDisassembly(byte[] buffer)
+        {
+            string hash;
+
+            using (var sha256 = SHA256.Create())
+                hash = Convert.ToBase64String(sha256.ComputeHash(buffer));
+
+            return disassemblies.GetOrAdd(hash, _ => new Lazy<string>(() =>
+                new LuauDisassembly(buffer).BuildDisassembly())).Value;
         }
 
         private static string getHash(string content)
@@ -147,6 +160,15 @@ namespace RobloxClientTracker
 
         private void recordPackage(string name, Instance package, string version = null, string registry = null)
         {
+            var srcPath = Path.Combine(stageDir, "LuaPackages", "Packages", $"{name}.lua");
+            var binPath = Path.Combine(stageDir, "LuaPackages", "Packages", "_Index", name);
+
+            if (File.Exists(srcPath))
+                return;
+
+            if (Directory.Exists(binPath) && Directory.GetFiles(binPath).Length > 0)
+                return;
+
             var contentMap = new Dictionary<string, string>();
             package.Parent = null;
 
@@ -158,15 +180,11 @@ namespace RobloxClientTracker
                 variants = Packages[name];
             }
 
-            // early out
-            if (version != null && variants.ContainsKey(version))
-                return;
-
             foreach (var item in package.GetDescendants())
             {
                 if (item is LuaSourceContainer lua)
                 {
-                    var path = item.GetFullName();
+                    var path = item.GetFullName().Substring(package.Name.Length + 1);
                     ProtectedString source = null;
 
                     if (lua is Script script)
@@ -188,10 +206,7 @@ namespace RobloxClientTracker
                         {
                             if (source.IsCompiled)
                             {
-                                var data = source.RawBuffer;
-                                var disassembler = new LuauDisassembly(data);
-
-                                contents = disassembler.BuildDisassembly();
+                                contents = getDisassembly(source.RawBuffer);
                                 path += "c";
                             }
                             else
@@ -229,9 +244,9 @@ namespace RobloxClientTracker
             string hash = getHash(content);
 
             // Unlikely to collide, but maybe once in a blue moon.
-            string id = version ?? hash.Substring(0, 8);
+            string id = version == null ? hash.Substring(0, 8) : version + "-" + hash.Substring(0, 8);
 
-            if (variants.ContainsKey(id))
+            if (variants.ContainsKey(hash))
                 return;
 
             var compiledPackages = createDirectory(stageDir, "CompiledPackages");
@@ -283,8 +298,7 @@ namespace RobloxClientTracker
 
                 try
                 {
-                    var disassembler = new LuauDisassembly(buffer);
-                    string disassembly = disassembler.BuildDisassembly();
+                    string disassembly = getDisassembly(buffer);
                     writeFile(writePath + ".s", disassembly, LogRbxm);
                 }
                 catch (Exception e)

@@ -1,3 +1,4 @@
 ﻿{
-  "FFlagIncludeLegacyNamesInJsonApiDump": true
+  "FFlagIncludeLegacyNamesInJsonApiDump": true,
+  "FFlagFixFullAPIDump": true
 }

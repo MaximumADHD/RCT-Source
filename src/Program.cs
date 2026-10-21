@@ -19,6 +19,7 @@ using RobloxDeployHistory;
 using RobloxStudioModManager;
 using RobloxClientTracker.Utility;
 using RobloxFiles;
+using Microsoft.Win32;
 
 #pragma warning disable IDE1006 // Naming Styles
 
@@ -154,7 +155,7 @@ namespace RobloxClientTracker
             "rbxPkgManifest.txt",
 
             "ReflectionMetadata.xml",
-            "RobloxStudioRibbon.xml"
+            //"RobloxStudioRibbon.xml"
         };
 
         static readonly IReadOnlyDictionary<string, ConsoleColor> changeTypeColors = new Dictionary<string, ConsoleColor>()
@@ -565,7 +566,7 @@ namespace RobloxClientTracker
                 }
 
                 // Check for updates to the version
-                ClientVersionInfo info = await StudioBootstrapper.GetCurrentVersionInfo(state.VersionData);
+                ClientVersionInfo info = await StudioBootstrapper.GetCurrentVersionInfo("", state.VersionData, state.ChannelData);
                 
                 if (!string.IsNullOrEmpty(FORCE_VERSION_ID))
                     info = new ClientVersionInfo(FORCE_VERSION_ID, info.VersionGuid);
@@ -665,10 +666,11 @@ namespace RobloxClientTracker
                         string versionId = info.Version;
                         print("Creating commits...", YELLOW);
 
-                        stageCommit($"{versionId} (Scripts)", 
-                            "*.lua", "*.luac", "*.luac.s"
+                        stageCommit($"{versionId} (Compiled Scripts)",
+                            "*.luac", "*.luac.s"
                         );
 
+                        stageCommit($"{versionId} (Scripts)", "*.lua");
                         stageCommit($"{versionId} (Shaders)", "*.frag", "*.vert");
                         stageCommit($"{versionId} (Images)", "*.png", "*.jpg", "*.bmp", "*.gif");
                         stageCommit($"{versionId} (JSON)", "*.json");
@@ -683,6 +685,12 @@ namespace RobloxClientTracker
 
                         if (!string.IsNullOrEmpty(postScript))
                         {
+                            // Temporarily update studio launch registry path to the build
+                            // we just installed so the post script launches this build of studio.
+
+                            var rbxl = Registry.ClassesRoot.CreateSubKey(@"Roblox.Place\shell\open\command");
+                            rbxl.SetValue("", $"\"{studioPath}\" -task EditFile -localPlaceFile \"%1\"");
+
                             var fileInfo = new FileInfo(postScript);
                             var dirName = fileInfo.DirectoryName;
 
@@ -1041,6 +1049,10 @@ namespace RobloxClientTracker
                     }
 
                     var start = name.Substring(0, 1);
+
+                    if (!Regex.Match(start, "[A-z0-9]").Success)
+                        Console.WriteLine($"WTF {name}");
+
                     var dir = Path.Combine(fvars, flagType, start);
                     Directory.CreateDirectory(dir);
 
@@ -1076,7 +1088,7 @@ namespace RobloxClientTracker
 
                 string timeStamp = DateTime.Now.ToString(CultureInfo.InvariantCulture);
 
-                if (stageCommit(timeStamp, "*.*"))
+                if (stageCommit(timeStamp, "."))
                 {
                     print("Pushing to GitHub...", CYAN);
                     git("push");

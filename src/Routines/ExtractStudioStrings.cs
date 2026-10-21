@@ -357,7 +357,7 @@ namespace RobloxClientTracker
                     }
                 }
 
-                if (offsets.Count < 3)
+                if (offsets.Count < 12)
                 {
                     // Try again.
                     offsets.Clear();

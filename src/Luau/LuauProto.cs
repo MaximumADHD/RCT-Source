@@ -129,12 +129,12 @@ namespace RobloxClientTracker.Luau
                         }
                         case LuauOpcode.LOADN:
                         {
-                            line += $"R{A()} {B()}";
+                            line += $"R{A()} {D()}";
                             break;
                         }
                         case LuauOpcode.LOADK:
                         {
-                            line += $"R{A()} {CONST(B)}";
+                            line += $"R{A()} {CONST(D)}";
                             break;
                         }
                         case LuauOpcode.NOT:
@@ -194,11 +194,15 @@ namespace RobloxClientTracker.Luau
                         case LuauOpcode.DIVK:
                         case LuauOpcode.POWK:
                         case LuauOpcode.MODK:
-                        case LuauOpcode.DIVRK:
                         case LuauOpcode.IDIVK:
-                        case LuauOpcode.SUBRK:
                         {
                             line += $"R{A()} R{B()} {CONST(C)}";
+                            break;
+                        }
+                        case LuauOpcode.SUBRK:
+                        case LuauOpcode.DIVRK:
+                        {
+                            line += $"R{A()} {CONST(B)} R{C()}";
                             break;
                         }
                         case LuauOpcode.NAMECALL:
@@ -302,7 +306,8 @@ namespace RobloxClientTracker.Luau
                         }
                         case LuauOpcode.LOADKX:
                         {
-                            line += $"R{A()} {CONST(B)}";
+                            line += $"R{A()} {CONST(AUX)}";
+                            code++; // AUX
                             break;
                         }
                         case LuauOpcode.JUMPX:
@@ -378,6 +383,33 @@ namespace RobloxClientTracker.Luau
                             line = string.Format("  {0,5} {1,-32} ", code, opName);
                             line += $"R{A()} {CONST(index)} {JUMP(D)}";
 
+                            code++; // AUX
+                            break;
+                        }
+                        case LuauOpcode.GETUDATAKS:
+                        case LuauOpcode.SETUDATAKS:
+                        case LuauOpcode.NAMECALLUDATA:
+                        {
+                            line += $"R{A()} R{B()} {CONST(LuauInsn.AUX_KV16(AUX))}";
+                            code++; // AUX
+                            break;
+                        }
+                        case LuauOpcode.NEWCLASSMEMBER:
+                        {
+                            line += $"R{A()} R{C()} {CONST(AUX)}";
+                            code++; // AUX
+                            break;
+                        }
+                        case LuauOpcode.CALLFB:
+                        {
+                            string slot = AUX == LuauInsn.FBSLOT_SEALED ? "sealed" : $"FB{AUX}";
+                            line += $"R{A()} {(int)B() - 1} {(int)C() - 1} [{slot}]";
+                            code++; // AUX
+                            break;
+                        }
+                        case LuauOpcode.CMPPROTO:
+                        {
+                            line += $"R{A()} P{AUX} {JUMP(D)}";
                             code++; // AUX
                             break;
                         }

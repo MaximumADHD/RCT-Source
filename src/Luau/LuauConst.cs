@@ -23,6 +23,7 @@ namespace RobloxClientTracker.Luau
                 }
                 case LuauConstType.BOOLEAN:
                 case LuauConstType.NUMBER:
+                case LuauConstType.INTEGER:
                 {
                     result += Value.ToString();
                     break;
@@ -94,6 +95,36 @@ namespace RobloxClientTracker.Luau
 
                     break;
                 }
+                case LuauConstType.TABLE_WITH_CONSTANTS:
+                {
+                    if (Value is int[] kvs)
+                    {
+                        var entries = new string[kvs.Length / 2];
+
+                        for (int i = 0; i < entries.Length; i++)
+                        {
+                            int key = kvs[i * 2];
+                            int val = kvs[i * 2 + 1];
+                            string keyStr = key == 0 ? (i + 1).ToString() : Proto.Consts[key].ToString();
+
+                            // A negative value index is a sentinel meaning "no pre-filled
+                            // constant" (the VM defaults it to 0); render just the key to
+                            // match the reference disassembler and avoid indexing Consts[-1].
+
+                            if (val < 0 || val >= Proto.Consts.Length)
+                            {
+                                entries[i] = $"[{keyStr}]";
+                                continue;
+                            }
+
+                            entries[i] = $"[{keyStr}] = {Proto.Consts[val]}";
+                        }
+
+                        result += $"{{{string.Join(", ", entries)}}}";
+                    }
+
+                    break;
+                }
                 case LuauConstType.VECTOR:
                 {
                     if (Value is Array array)
@@ -104,12 +135,22 @@ namespace RobloxClientTracker.Luau
 
                         result += $"{{{string.Join(", ", vec)}}}";
                     }
-                    
+
                     break;
                 }
                 case LuauConstType.CLOSURE:
                 {
                     result += $"PROTO_{Value}";
+                    break;
+                }
+                case LuauConstType.CLASS_SHAPE:
+                {
+                    if (Value is LuauClassShape cs)
+                    {
+                        string name = Proto.Consts[cs.ClassName].Value?.ToString() ?? "?";
+                        result += $"class {name} (props: {cs.PropertyNames.Length}, methods: {cs.MethodNames.Length})";
+                    }
+
                     break;
                 }
                 case LuauConstType.IMPORT:

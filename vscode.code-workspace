@@ -1,0 +1,33 @@
+{
+	"folders": [
+		{
+			"path": "C:/Roblox-Client-Tracker",
+			"name": "trunk",
+		},
+		{
+			"path": "../Roblox-Studio-Mod-Manager",
+			"name": "[SubModule] Roblox-Studio-Mod-Manager"
+		},
+		{
+			"path": "../Roblox-API-Dump-Tool",
+			"name": "[SubModule] Roblox-API-Dump-Tool"
+		},
+		{
+			"path": "../Roblox-Deploy-History",
+			"name": "[SubModule] Roblox-Deploy-History"
+		},
+		{
+			"path": "../Roblox-File-Format",
+			"name": "[SubModule] Roblox-File-Format"
+		},
+		{
+			"path": "../maximumadhd.github.io",
+			"name": "maximumadhd.github.io"
+		},
+		{
+			"path": ".",
+			"name": "src"
+		}
+	],
+	"settings": {}
+}

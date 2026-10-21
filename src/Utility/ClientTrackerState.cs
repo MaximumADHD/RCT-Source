@@ -12,7 +12,9 @@ namespace RobloxClientTracker
         public string Channel { get; set; } = "";
         public string Version { get; set; } = "";
 
+        public ChannelManifest ChannelData { get; set; } = new ChannelManifest();
         public VersionManifest VersionData { get; set; } = new VersionManifest();
+
         public SortedDictionary<string, string> FileManifest { get; set; } = new SortedDictionary<string, string>();
         public SortedDictionary<string, PackageState> PackageManifest { get; set; } = new SortedDictionary<string, PackageState>();
 

@@ -1,9 +1,7 @@
 ﻿using RobloxDeployHistory;
+
 using System;
-using System.Collections.Generic;
 using System.IO;
-using System.Linq;
-using System.Text;
 using System.Threading.Tasks;
 
 namespace RobloxClientTracker
@@ -14,22 +12,35 @@ namespace RobloxClientTracker
 
         public override void ExecuteRoutine()
         {
-            var historyPath = Path.Combine(stageDir, "version-history.json");
-            var jsonHistory = File.ReadAllText(historyPath);
+            for (int retry = 1; retry < 10; retry++)
+            {
+                var historyPath = Path.Combine(stageDir, "version-history.json");
+                var jsonHistory = File.Exists(historyPath) ? File.ReadAllText(historyPath) : "{}";
 
-            var versionPath = Path.Combine(stageDir, "version.txt");
-            var version = File.ReadAllText(versionPath);
+                var versionPath = Path.Combine(stageDir, "version.txt");
+                var version = File.Exists(versionPath) ? File.ReadAllText(versionPath) : null;
 
-            var guidPath = Path.Combine(stageDir, "version-guid.txt");
-            var guid = File.ReadAllText(guidPath);
+                var guidPath = Path.Combine(stageDir, "version-guid.txt");
+                var guid = File.Exists(guidPath) ? File.ReadAllText(guidPath) : null;
 
-            print($"Updating version history... ({version} = {guid})");
-            var append = StudioDeployLogs.AppendToHistoryLedger(jsonHistory, version, guid);
+                if (version == null || guid == null)
+                {
+                    var timeout = Task.Delay(1000);
+                    print($"Version or GUID is null, retrying... ({retry}/10)", ConsoleColor.Red);
 
-            append.Wait();
-            jsonHistory = append.Result;
+                    timeout.Wait();
+                    continue;
+                }
 
-            File.WriteAllText(historyPath, jsonHistory);
+                print($"Updating version history... ({version} = {guid})");
+                var append = StudioDeployLogs.AppendToHistoryLedger(jsonHistory, version, guid);
+
+                append.Wait();
+                jsonHistory = append.Result;
+
+                File.WriteAllText(historyPath, jsonHistory);
+                break;
+            }
         }
     }
 }
