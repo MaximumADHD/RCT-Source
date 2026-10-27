@@ -27,8 +27,8 @@ on:
         default: false
         type: boolean
       publish:
-        description: Commit and push (scheduled runs always publish)
-        default: false
+        description: Commit and push results (disable for a dry run; scheduled runs always publish)
+        default: true
         type: boolean
 
 permissions:
@@ -169,7 +169,12 @@ jobs:
           if [ -n "$VERSION" ]; then args+=(--version "$VERSION"); fi
           if [ -n "$VERSION_GUID" ]; then args+=(--version-guid "$VERSION_GUID"); fi
           if [ "$FORCE" = true ]; then args+=(--force); fi
-          if [ "$PUBLISH" = true ]; then args+=(--commit --push); fi
+          if [ "$PUBLISH" = true ]; then
+            echo "::notice::Publishing enabled: changes will be committed and pushed."
+            args+=(--commit --push)
+          else
+            echo "::notice::Dry run: changes will only be uploaded as stage artifacts."
+          fi
           python RCT-Source/scripts/tracker.py "${args[@]}"
       - uses: actions/upload-artifact@v4
         if: env.PUBLISH != 'true'
@@ -208,7 +213,12 @@ jobs:
           git -C stage config user.name "$BOT_NAME"
           git -C stage config user.email "$BOT_EMAIL"
           args=(flags --stage-dir "$GITHUB_WORKSPACE/stage")
-          if [ "$PUBLISH" = true ]; then args+=(--commit --push); fi
+          if [ "$PUBLISH" = true ]; then
+            echo "::notice::Publishing enabled: changes will be committed and pushed."
+            args+=(--commit --push)
+          else
+            echo "::notice::Dry run: changes will only be uploaded as stage artifacts."
+          fi
           python RCT-Source/scripts/tracker.py "${args[@]}"
       - uses: actions/upload-artifact@v4
         if: env.PUBLISH != 'true'

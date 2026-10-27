@@ -144,8 +144,10 @@ CLI changes must be pushed before the workflow can build them from GitHub.
 
 Scheduled runs publish every five minutes, subject to GitHub's scheduler delays.
 Public-repository schedules can be disabled by GitHub after extended inactivity.
-Manual runs default to a dry run and upload stage artifacts; select **publish**
-explicitly to push. Manual inputs also support channel, target branch, a pinned
+Manual runs default to committing and pushing; deselect **publish** for a dry run
+that uploads stage artifacts instead. Push-triggered runs remain non-publishing.
+The `tracker-tools` artifact is always used to transfer binaries between jobs and
+does not replace publishing tracker results. Manual inputs also support channel, target branch, a pinned
 version/GUID pair, and forced rebuilds. Pull requests only build/test tools.
 Concurrency prevents overlapping tracker workflows. Unset target variables leave
 the corresponding jobs disabled, making the initial deployment opt-in.
