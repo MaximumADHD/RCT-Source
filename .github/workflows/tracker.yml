@@ -1,9 +1,6 @@
 name: Roblox Tracker
 
 on:
-  push:
-    branches: [main, master]
-  pull_request:
   schedule:
     - cron: '*/5 * * * *'
   workflow_dispatch:
