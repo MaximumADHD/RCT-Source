@@ -136,6 +136,38 @@ class VersionCheckTests(unittest.TestCase):
             self.assertFalse(output.exists())
 
 class OrchestrationTests(unittest.TestCase):
+    def test_flag_platform_keys_follow_invariant_order(self):
+        expected = ["AndroidApp", "iOSApp", "MacClientBootstrapper", "MacDesktopClient",
+                    "MacStudioApp", "MacStudioBootstrapper", "PCClientBootstrapper",
+                    "PCDesktopClient", "PCStudioApp", "PCStudioBootstrapper",
+                    "PlayStationClient", "UWPApp", "XboxClient"]
+        platforms = {platform: index for index, platform in enumerate(reversed(flag_tracker.PLATFORMS))}
+        documents = [
+            {"Type": "Platforms", "Value": platforms},
+            {"Type": "ChannelsAndPlatforms", "Value": {"zintegration": platforms, "LIVE": platforms}},
+        ]
+        with tempfile.TemporaryDirectory() as temporary:
+            path = Path(temporary) / "flag.json"
+            for document in documents:
+                with self.subTest(type=document["Type"]):
+                    flag_tracker.write_json(path, document)
+                    output = json.loads(path.read_text())
+                    mappings = [output["Value"]] if document["Type"] == "Platforms" else output["Value"].values()
+                    for mapping in mappings:
+                        self.assertEqual(list(mapping), expected)
+                        self.assertEqual(mapping, platforms)
+                    if document["Type"] == "ChannelsAndPlatforms":
+                        self.assertEqual(list(output["Value"]), ["LIVE", "zintegration"])
+
+    def test_non_platform_flag_keys_keep_ordinal_order(self):
+        value = {"FFlagapple": True, "FFlagZebra": False, "FFlagApple": True}
+        with tempfile.TemporaryDirectory() as temporary:
+            path = Path(temporary) / "legacy.json"
+            flag_tracker.write_json(path, value)
+            output = json.loads(path.read_text())
+        self.assertEqual(list(output), ["FFlagApple", "FFlagZebra", "FFlagapple"])
+        self.assertEqual(output, value)
+
     def test_flag_snapshot_preserves_spaces_in_real_keys(self):
         name = "FFlagDebugAlwaysDisplayRenderStats "
         response = json.dumps({"applicationSettings": {name: "True"}}).encode()

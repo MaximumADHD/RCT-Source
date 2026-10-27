@@ -20,9 +20,18 @@ PREFIXES = ("FFlag", "FString", "FInt", "FLog",
             "SFFlag", "SFString", "SFInt", "SFLog")
 
 
+def ordered_json(value):
+    if isinstance(value, dict):
+        key_order = str.casefold if all(key in PLATFORMS for key in value) else None
+        return {key: ordered_json(value[key]) for key in sorted(value, key=key_order)}
+    if isinstance(value, (list, tuple)):
+        return [ordered_json(item) for item in value]
+    return value
+
+
 def write_json(path, value):
     path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(json.dumps(value, indent=2, sort_keys=True, ensure_ascii=False), encoding="utf-8", newline="")
+    path.write_text(json.dumps(ordered_json(value), indent=2, ensure_ascii=False), encoding="utf-8", newline="")
 
 
 def flag_value(value):
