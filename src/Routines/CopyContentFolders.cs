@@ -57,9 +57,15 @@ namespace RobloxClientTracker
             var path = folderName.Split('\\');
             var dest = path.Last();
 
-            string srcFolder = Path.Combine(studioDir, folderName);
-            string destFolder = createDirectory(stageDir, dest.Replace('_', '-'));
+            string srcFolder = Path.Combine(studioDir, Path.Combine(path));
 
+            if (!Directory.Exists(srcFolder))
+            {
+                print($"Content folder is not present in this build: {srcFolder}", ConsoleColor.Yellow);
+                return;
+            }
+
+            string destFolder = createDirectory(stageDir, dest.Replace('_', '-'));
             print($"Copying {srcFolder} to {destFolder}");
             copyDirectory(srcFolder, destFolder);
 

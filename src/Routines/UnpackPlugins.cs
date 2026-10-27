@@ -17,8 +17,6 @@ namespace RobloxClientTracker
         {
             foreach (string folderName in pluginFolders)
             {
-                string studioDir = studio.GetLocalStudioDirectory();
-
                 string srcFolder = Path.Combine(studioDir, folderName, "Optimized_Embedded_Signature");
                 string destFolder = Path.Combine(stageDir, folderName);
 

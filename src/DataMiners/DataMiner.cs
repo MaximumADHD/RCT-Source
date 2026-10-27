@@ -19,17 +19,12 @@ namespace RobloxClientTracker
         public abstract void ExecuteRoutine();
 
         // Protected utility fields for the derived classes to use.
-        protected static StudioBootstrapper studio => Program.studio;
         protected static ClientTrackerState state => Program.state;
 
-        protected static string studioDir => studio.GetLocalStudioDirectory();
+        protected static string studioDir => Program.studioDir;
         protected static string studioPath => Program.studioPath;
         
         protected static string stageDir => Program.stageDir;
-        protected static string branch => Program.branch;
-        protected static string trunk => Program.trunk;
-
-        protected IEnumerable<string> git(params string[] args) => Program.git(args);
         protected IEnumerable<string> cmd(string workDir, string name, params string[] args) => Program.cmd(workDir, name, args);
 
         protected void print(string message, ConsoleColor? color = null) => Program.print(message, color ?? LogColor);

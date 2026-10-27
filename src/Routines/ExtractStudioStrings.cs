@@ -201,7 +201,9 @@ namespace RobloxClientTracker
                     string data = '?' + symbol;
 
                     if (data.ToUpperInvariant().EndsWith("@@", Program.InvariantString))
+                    {
                         rawSymbols.Add(data);
+                    }
                 }
             });
 
@@ -209,10 +211,63 @@ namespace RobloxClientTracker
             var lines = new List<string>();
             var output = new StringBuilder(8192);
 
-            foreach (string data in rawSymbols.Distinct())
+            var symbols = rawSymbols.Distinct().OrderBy(symbol => symbol, StringComparer.Ordinal).ToArray();
+            Dictionary<string, string> demangled = null;
+
+            if (!OperatingSystem.IsWindows())
             {
+                var start = new ProcessStartInfo(Program.Undname)
+                {
+                    UseShellExecute = false,
+                    RedirectStandardInput = true,
+                    RedirectStandardOutput = true,
+                    RedirectStandardError = true,
+                };
+
+                using var process = Process.Start(start);
+                var result = process.StandardOutput.ReadToEndAsync();
+                var errors = process.StandardError.ReadToEndAsync();
+
+                foreach (string symbol in symbols)
+                    process.StandardInput.WriteLine("." + symbol);
+                
+                process.StandardInput.Close();
+                process.WaitForExit();
+
+                Task.WaitAll(result, errors);
+
+                if (process.ExitCode > 1)
+                    throw new InvalidDataException("llvm-undname failed: " + errors.Result);
+                
+                const string suffix = " `RTTI Type Descriptor Name'";
+                demangled = new Dictionary<string, string>(StringComparer.Ordinal);
+                string current = null;
+
+                foreach (string line in result.Result.Split('\n').Select(line => line.TrimEnd('\r')))
+                {
+                    if (line.StartsWith(".?", StringComparison.Ordinal))
+                        current = line.Substring(1);
+                    else if (current != null && line.EndsWith(suffix, StringComparison.Ordinal))
+                        demangled[current] = line.Substring(0, line.Length - suffix.Length);
+                }
+
+                if (symbols.Length > 0 && demangled.Count == 0)
+                    throw new InvalidDataException("llvm-undname decoded no C++ types.");
+                
+                print($"Decoded {demangled.Count}/{symbols.Length} C++ types using LLVM.");
+            }
+
+            for (int index = 0; index < symbols.Length; index++)
+            {
+                string data = symbols[index];
                 output.Clear();
-                UnDecorateSymbolName(data, output, 8192, UnDecorateFlags.UNDNAME_NO_ARGUMENTS);
+                
+                if (OperatingSystem.IsWindows())
+                    UnDecorateSymbolName(data, output, 8192, UnDecorateFlags.UNDNAME_NO_ARGUMENTS);
+                else if (demangled.TryGetValue(data, out string decoded))
+                    output.Append(decoded);
+                else
+                    continue;
 
                 string result = output.ToString();
 

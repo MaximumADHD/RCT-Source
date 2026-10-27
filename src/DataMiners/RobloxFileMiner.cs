@@ -31,7 +31,7 @@ namespace RobloxClientTracker
             public string Version;
         }
 
-        private static Dictionary<string, string> modelManifest => state.ModelManifest;
+        private static ConcurrentDictionary<string, string> modelManifest => state.ModelManifest;
         public static ConcurrentDictionary<string, ConcurrentDictionary<string, PackageRecord>> Packages = new ConcurrentDictionary<string, ConcurrentDictionary<string, PackageRecord>>();
         private static readonly ConcurrentDictionary<string, Lazy<string>> disassemblies = new ConcurrentDictionary<string, Lazy<string>>();
 

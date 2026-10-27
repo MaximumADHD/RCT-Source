@@ -1,0 +1,220 @@
+name: Roblox Tracker
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+  schedule:
+    - cron: '*/5 * * * *'
+  workflow_dispatch:
+    inputs:
+      channel:
+        description: Studio deployment channel
+        default: LIVE
+        type: string
+      branch:
+        description: Target client-tracker branch
+        default: roblox
+        type: string
+      version:
+        description: Optional four-part version (requires version_guid)
+        type: string
+      version_guid:
+        description: Optional pinned version GUID (requires version)
+        type: string
+      force:
+        description: Rebuild even if the target already has this version
+        default: false
+        type: boolean
+      publish:
+        description: Commit and push (scheduled runs always publish)
+        default: false
+        type: boolean
+
+permissions:
+  contents: read
+
+concurrency:
+  group: roblox-tracker-${{ github.repository }}
+  cancel-in-progress: false
+
+jobs:
+  version:
+    if: github.event_name != 'pull_request' && vars.RCT_CLIENT_REPOSITORY != ''
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    outputs:
+      update_required: ${{ steps.check.outputs.update_required }}
+      version: ${{ steps.check.outputs.version }}
+      version_guid: ${{ steps.check.outputs.version_guid }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          path: RCT-Source
+          sparse-checkout: scripts
+          persist-credentials: false
+      - name: Check client version before preparing tools
+        id: check
+        env:
+          GH_TOKEN: ${{ secrets.RCT_PUBLISH_TOKEN || github.token }}
+          TARGET_REPOSITORY: ${{ vars.RCT_CLIENT_REPOSITORY }}
+          TARGET_BRANCH: ${{ inputs.branch || vars.RCT_BRANCH || 'roblox' }}
+          CHANNEL: ${{ inputs.channel || vars.RCT_CHANNEL || 'LIVE' }}
+          VERSION: ${{ inputs.version }}
+          VERSION_GUID: ${{ inputs.version_guid }}
+          FORCE: ${{ inputs.force }}
+        run: |
+          args=(--repository "$TARGET_REPOSITORY" --branch "$TARGET_BRANCH" --channel "$CHANNEL")
+          if [ -n "$VERSION" ]; then args+=(--version "$VERSION"); fi
+          if [ -n "$VERSION_GUID" ]; then args+=(--version-guid "$VERSION_GUID"); fi
+          if [ "$FORCE" = true ]; then args+=(--force); fi
+          python3 RCT-Source/scripts/check_version.py "${args[@]}"
+
+  tools:
+    needs: version
+    if: >-
+      !cancelled() && (github.event_name == 'push' || github.event_name == 'pull_request' ||
+      needs.version.outputs.update_required == 'true')
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          path: RCT-Source
+          persist-credentials: false
+      - uses: actions/checkout@v4
+        with:
+          repository: MaximumADHD/Roblox-Studio-Mod-Manager
+          path: Roblox-Studio-Mod-Manager
+          persist-credentials: false
+      - uses: actions/checkout@v4
+        with:
+          repository: MaximumADHD/Roblox-Deploy-History
+          path: Roblox-Deploy-History
+          persist-credentials: false
+      - uses: actions/checkout@v4
+        with:
+          repository: MaximumADHD/Roblox-API-Dump-Tool
+          path: Roblox-API-Dump-Tool
+          persist-credentials: false
+      - uses: actions/checkout@v4
+        with:
+          repository: MaximumADHD/Roblox-File-Format
+          path: Roblox-File-Format
+          persist-credentials: false
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Publish portable tools
+        run: python RCT-Source/scripts/tracker.py tools --tools-dir "$GITHUB_WORKSPACE/artifacts/tools"
+      - name: Test orchestration and managed Qt extractor
+        env:
+          RCT_CLI: ${{ github.workspace }}/artifacts/tools/RobloxClientTracker/RobloxClientTracker.dll
+        run: python -m unittest discover -s RCT-Source/tests -v
+      - uses: actions/upload-artifact@v4
+        with:
+          name: tracker-tools
+          path: artifacts/tools
+          retention-days: 1
+
+  client:
+    needs: [version, tools]
+    if: needs.version.outputs.update_required == 'true'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    env:
+      CHANNEL: ${{ inputs.channel || vars.RCT_CHANNEL || 'LIVE' }}
+      TARGET_BRANCH: ${{ inputs.branch || vars.RCT_BRANCH || 'roblox' }}
+      VERSION: ${{ needs.version.outputs.version }}
+      VERSION_GUID: ${{ needs.version.outputs.version_guid }}
+      FORCE: ${{ inputs.force }}
+      PUBLISH: ${{ github.event_name == 'schedule' || (github.event_name == 'workflow_dispatch' && inputs.publish) }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          path: RCT-Source
+          persist-credentials: false
+      - uses: actions/checkout@v4
+        with:
+          repository: ${{ vars.RCT_CLIENT_REPOSITORY }}
+          ref: ${{ env.TARGET_BRANCH }}
+          path: stage
+          token: ${{ secrets.RCT_PUBLISH_TOKEN || github.token }}
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - uses: actions/download-artifact@v4
+        with:
+          name: tracker-tools
+          path: artifacts/tools
+      - name: Install Linux demangler
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends llvm
+      - name: Build and optionally publish
+        env:
+          RBX_CHANNEL_TOKEN: ${{ secrets.RBX_CHANNEL_TOKEN }}
+          BOT_NAME: ${{ vars.RCT_BOT_NAME || 'Roblox Client Tracker' }}
+          BOT_EMAIL: ${{ vars.RCT_BOT_EMAIL || '41898282+github-actions[bot]@users.noreply.github.com' }}
+        run: |
+          git -C stage config user.name "$BOT_NAME"
+          git -C stage config user.email "$BOT_EMAIL"
+          args=(client --tools-dir "$GITHUB_WORKSPACE/artifacts/tools" --build-dir "$RUNNER_TEMP/build" --stage-dir "$GITHUB_WORKSPACE/stage" --channel "$CHANNEL")
+          if [ -n "$VERSION" ]; then args+=(--version "$VERSION"); fi
+          if [ -n "$VERSION_GUID" ]; then args+=(--version-guid "$VERSION_GUID"); fi
+          if [ "$FORCE" = true ]; then args+=(--force); fi
+          if [ "$PUBLISH" = true ]; then args+=(--commit --push); fi
+          python RCT-Source/scripts/tracker.py "${args[@]}"
+      - uses: actions/upload-artifact@v4
+        if: env.PUBLISH != 'true'
+        with:
+          name: client-stage
+          path: |
+            stage/**
+            !stage/.git/**
+          retention-days: 3
+
+  flags:
+    if: github.event_name != 'pull_request' && vars.RCT_FLAGS_REPOSITORY != ''
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    env:
+      PUBLISH: ${{ github.event_name == 'schedule' || (github.event_name == 'workflow_dispatch' && inputs.publish) }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          path: RCT-Source
+          persist-credentials: false
+      - uses: actions/checkout@v4
+        with:
+          repository: ${{ vars.RCT_FLAGS_REPOSITORY }}
+          ref: ${{ vars.RCT_FLAGS_BRANCH || 'main' }}
+          path: stage
+          token: ${{ secrets.RCT_PUBLISH_TOKEN || github.token }}
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Track FastFlags
+        env:
+          BOT_NAME: ${{ vars.RCT_BOT_NAME || 'Roblox Client Tracker' }}
+          BOT_EMAIL: ${{ vars.RCT_BOT_EMAIL || '41898282+github-actions[bot]@users.noreply.github.com' }}
+        run: |
+          git -C stage config user.name "$BOT_NAME"
+          git -C stage config user.email "$BOT_EMAIL"
+          args=(flags --stage-dir "$GITHUB_WORKSPACE/stage")
+          if [ "$PUBLISH" = true ]; then args+=(--commit --push); fi
+          python RCT-Source/scripts/tracker.py "${args[@]}"
+      - uses: actions/upload-artifact@v4
+        if: env.PUBLISH != 'true'
+        with:
+          name: flags-stage
+          path: |
+            stage/**
+            !stage/.git/**
+          retention-days: 3

@@ -26,7 +26,6 @@ namespace RobloxClientTracker
 
         public override void ExecuteRoutine()
         {
-            string studioDir = studio.GetLocalStudioDirectory();
             string shaderDir = createDirectory(studioDir, "shaders");
 
             var names = new List<string>();

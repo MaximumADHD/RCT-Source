@@ -1,4 +1,5 @@
-﻿using RobloxDeployHistory;
+﻿using System.Collections.Generic;
+using Newtonsoft.Json;
 
 using System;
 using System.IO;
@@ -33,10 +34,10 @@ namespace RobloxClientTracker
                 }
 
                 print($"Updating version history... ({version} = {guid})");
-                var append = StudioDeployLogs.AppendToHistoryLedger(jsonHistory, version, guid);
-
-                append.Wait();
-                jsonHistory = append.Result;
+                var history = JsonConvert.DeserializeObject<SortedDictionary<string, string>>(jsonHistory)
+                    ?? new SortedDictionary<string, string>(StringComparer.Ordinal);
+                history[version.Trim()] = guid.Trim();
+                jsonHistory = JsonConvert.SerializeObject(history, Formatting.Indented);
 
                 File.WriteAllText(historyPath, jsonHistory);
                 break;

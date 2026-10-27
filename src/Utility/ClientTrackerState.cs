@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Collections.Concurrent;
 using System.IO;
 
 using RobloxStudioModManager;
@@ -18,7 +19,7 @@ namespace RobloxClientTracker
         public SortedDictionary<string, string> FileManifest { get; set; } = new SortedDictionary<string, string>();
         public SortedDictionary<string, PackageState> PackageManifest { get; set; } = new SortedDictionary<string, PackageState>();
 
-        public Dictionary<string, string> ModelManifest { get; set; } = new Dictionary<string, string>();
+        public ConcurrentDictionary<string, string> ModelManifest { get; set; } = new ConcurrentDictionary<string, string>();
         public Dictionary<string, Dictionary<string, string>> ShaderManifest = new Dictionary<string, Dictionary<string, string>>();
 
         public static ClientTrackerState Load(string studioDir)

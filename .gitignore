@@ -13,6 +13,10 @@
 *.userprefs
 
 # Build results
+__pycache__/
+*.pyc
+/build/
+/tools/
 [Dd]ebug/
 [Dd]ebugPublic/
 [Rr]elease/
