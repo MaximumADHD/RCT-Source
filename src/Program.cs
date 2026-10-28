@@ -40,34 +40,6 @@ namespace RobloxClientTracker
             return directory;
         }
 
-        public static IReadOnlyList<string> cmd(string workDir, string name, params string[] args)
-        {
-            var start = new ProcessStartInfo(name)
-            {
-                WorkingDirectory = workDir,
-                UseShellExecute = false,
-                RedirectStandardOutput = true,
-                RedirectStandardError = true,
-                CreateNoWindow = true,
-            };
-
-            foreach (string argument in args)
-                start.ArgumentList.Add(argument);
-            
-            using var process = Process.Start(start);
-
-            var output = process.StandardOutput.ReadToEndAsync();
-            var error = process.StandardError.ReadToEndAsync();
-
-            process.WaitForExit();
-            Task.WaitAll(output, error);
-
-            if (process.ExitCode != 0)
-                throw new InvalidOperationException($"{name} exited with {process.ExitCode}: {error.Result}");
-            
-            return output.Result.Split('\n').Select(line => line.TrimEnd('\r')).ToArray();
-        }
-
         static async Task<int> Main(string[] args)
         {
             try

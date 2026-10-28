@@ -21,11 +21,9 @@ namespace RobloxClientTracker
         // Protected utility fields for the derived classes to use.
         protected static ClientTrackerState state => Program.state;
 
+        protected static string stageDir => Program.stageDir;
         protected static string studioDir => Program.studioDir;
         protected static string studioPath => Program.studioPath;
-        
-        protected static string stageDir => Program.stageDir;
-        protected IEnumerable<string> cmd(string workDir, string name, params string[] args) => Program.cmd(workDir, name, args);
 
         protected void print(string message, ConsoleColor? color = null) => Program.print(message, color ?? LogColor);
         protected static string createDirectory(params string[] traversal) => Program.createDirectory(traversal);
