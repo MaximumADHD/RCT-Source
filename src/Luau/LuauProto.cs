@@ -10,6 +10,7 @@ namespace RobloxClientTracker.Luau
         public bool IsVarArg;
         public byte MaxStackSize;
         public LuauProtoFlags Flags;
+        public ulong Cost;
 
         public string[] Upvalues;
         public byte[] TypeInfo;
@@ -396,7 +397,11 @@ namespace RobloxClientTracker.Luau
                         }
                         case LuauOpcode.NEWCLASSMEMBER:
                         {
-                            line += $"R{A()} R{C()} {CONST(AUX)}";
+                            if ((LuauClassMemberVisibility)B() == LuauClassMemberVisibility.PRIVATE)
+                                line += $"R{A()} R{C()} {AUX_A()} [private]";
+                            else
+                                line += $"R{A()} R{C()} [public] {CONST(AUX)}";
+
                             code++; // AUX
                             break;
                         }
@@ -413,9 +418,48 @@ namespace RobloxClientTracker.Luau
                             code++; // AUX
                             break;
                         }
+                        case LuauOpcode.FASTPCALL:
+                        {
+                            string func = A() == 0 ? "pcall" : "xpcall";
+                            line += $"{func} {B()} {JUMP(C)}";
+                            break;
+                        }
+                        case LuauOpcode.NEWCLASS:
+                        {
+                            string super = B() == 0xFF ? "no_base" : $"R{B()}";
+                            line += $"R{A()} {super} {CONST(AUX)} {C()}";
+                            code++; // AUX
+                            break;
+                        }
+                        case LuauOpcode.CONSTRUCT:
+                        {
+                            line += $"R{A()} R{B()} [FB{AUX}]";
+                            code++; // AUX
+                            break;
+                        }
+                        case LuauOpcode.FINCONSTRUCT:
+                        {
+                            line += $"R{A()} {JUMP(C)}";
+                            break;
+                        }
+                        case LuauOpcode.GETPRIVATEFIELD:
+                        {
+                            string kind = LuauInsn.AUX_STATIC(AUX) > 0 ? "static" : "instance";
+                            string namecall = LuauInsn.AUX_NAMECALL(AUX) > 0 ? " [namecall]" : "";
+                            line += $"R{A()} R{B()} U{C()} {AUX_A()} [{kind}]{namecall}";
+                            code++; // AUX
+                            break;
+                        }
+                        case LuauOpcode.SETPRIVATEFIELD:
+                        {
+                            line += $"R{A()} R{B()} U{C()} {AUX_A()}";
+                            code++; // AUX
+                            break;
+                        }
                         default:
                         {
                             line += $" [!! UNIMPLEMENTED !!]";
+                            code += LuauInsn.GetOpLength(op) - 1;
                             break;
                         }
                     }

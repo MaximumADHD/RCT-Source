@@ -2,7 +2,7 @@
 	"folders": [
 		{
 			"path": "C:/Roblox-Client-Tracker",
-			"name": "trunk",
+			"name": "trunk"
 		},
 		{
 			"path": "../Roblox-Studio-Mod-Manager",
@@ -27,6 +27,9 @@
 		{
 			"path": ".",
 			"name": "src"
+		},
+		{
+			"path": "../../../AppData/Local/RobloxApiDumpFiles"
 		}
 	],
 	"settings": {}

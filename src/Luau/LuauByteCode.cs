@@ -48,10 +48,16 @@ namespace RobloxClientTracker.Luau
     // Version 5: Adds SUBRK/DIVRK and vector constants. Currently supported.
     // Version 6: Adds FASTCALL3. Currently supported.
     // Version 7: Adds LBC_CONSTANT_TABLE_WITH_CONSTANTS for DUPTABLE with pre-filled constant values. Currently supported.
-    // Version 8: Adds LBC_CONSTANT_INTEGER for 64-bit integer constants. Currently supported.
+    // Version 8: Adds LBC_CONSTANT_INTEGER for 64-bit integer constants. No longer supported when integers feature is enabled.
     // Version 9: Adds atom-based userdata field access acceleration. Currently supported.
-    // Version 10: Adds LBC_CONSTANT_CLASS_SHAPE and NEWCLASSMEMBER for use with Luau Classes. Experimental.
-    // Version 11: Adds CALLFB, CMPPROTO and feedback vector description. Experimental.
+    // Version 10: Adds LBC_CONSTANT_CLASS_SHAPE and NEWCLASSMEMBER for use with Luau Classes. No longer supported when class feature is enabled.
+    // Version 11: Adds CALLFB, CMPPROTO and feedback vector description. Currently supported.
+    // Version 12: Adds cost function serialized for proto and prepend each proto with size in bytes. Currently supported.
+    // Version 13: Adds support for double-precision vector constants. Currently supported.
+    // Version 14: Adds FASTPCALL. Currently supported.
+    //
+    // WIP Versions: Used for in-progress features that might require multiple changes to bytecode. Since these versions are higher than the non-WIP versions, they are responsible for maintaining compatibility with them.
+    // Version 100: Adds NEWCLASS, CONSTRUCT, FINCONSTRUCT, GETPRIVATEFIELD, and SETPRIVATEFIELD for use with Luau Classes. Experimental.
 
     // # Bytecode type information history
     // Version 1: (from bytecode version 4) Type information for function signature. Currently supported.
@@ -430,10 +436,10 @@ namespace RobloxClientTracker.Luau
         NAMECALLUDATA,
 
         // NEWCLASSMEMBER: register this method on a class object.
-        // A: target register of class
-        // B: reserved
+        // A: source register of class
+        // B: member visibility, see LuauClassMemberVisibility
         // C: initial value of this member. currently must be a function.
-        // AUX: The name of this member as a constant string
+        // AUX: If method is public, the name of this member as a constant string. If private, the bottom 8 bits contain the private method index, and the upper 24 bits are reserved.
         NEWCLASSMEMBER,
 
         // CALLFB: call specified function with collecting runtime stats in a feedback slot
@@ -448,6 +454,48 @@ namespace RobloxClientTracker.Luau
         // D: jump offset if proto doesn't match
         // AUX: proto id
         CMPPROTO,
+
+        // FASTPCALL: perform a fastcall of a built-in protected call function
+        // A: protected function id (0 - pcall, 1 - xpcall)
+        // B: number of explicit arguments before a variadic tail
+        // C: jump offset to get to following CALL
+        FASTPCALL,
+
+        // The following instructions appear only in experimental bytecode versions and are subject to change
+
+        // NEWCLASS: reify a class object
+        // A: target register of class
+        // B: source register of superclass, or 0xFF if no superclass
+        // C: bottom bit is 1 if the class is open, else 0; upper 7 bits are reserved
+        // AUX: constant table index of unreified class object
+        NEWCLASS,
+
+        // CONSTRUCT: duplicate table to ra using the constant table template specified in the feedback slot. if rb is a class with default constructor and duplicated table matches shape required by the class, creates an object using class's default constructor
+        // A: target register
+        // B: register that is likely to hold a class
+        // C: reserved
+        // AUX: feedback slot id
+        CONSTRUCT,
+
+        // FINCONSTRUCT: checks if object construction initiated by a preceding CONSTRUCT succeeded and either finishes result placement or fallbacks to a CALL instruction
+        // A: source register
+        // B: reserved
+        // C: jump offset to get to following CALL
+        FINCONSTRUCT,
+
+        // GETPRIVATEFIELD: retrieve the value of a private field from a class instance or its class
+        // A: target register of field value
+        // B: source register with class instance or class object
+        // C: upvalue index with expected class of instance or class object
+        // AUX: bottom 8 bits contain private field offset; bit 9 is 1 if the field is static; bit 10 is 1 if retrieval is for a namecall; remaining 22 bits are reserved
+        GETPRIVATEFIELD,
+
+        // SETPRIVATEFIELD: set the value of a private field on a class instance
+        // A: source register of field value
+        // B: source register with class instance
+        // C: upvalue index with expected class of instance
+        // AUX: bottom 8 bits contain private field offset. remaining 24 bits are reserved
+        SETPRIVATEFIELD,
 
         // Enum entry for number of opcodes, not a valid opcode by itself!
         COUNT,
@@ -492,8 +540,58 @@ namespace RobloxClientTracker.Luau
         public static uint AUX_KV16(uint aux) => aux & 0xFFFFu;
         public static uint AUX_SLOT(uint aux) => aux >> 16;
 
+        // Auxiliary NAMECALL, STATIC: 1-bit flags indicating if field is static or access is for namecall
+        // Used in GETPRIVATEFIELD
+        public static uint AUX_STATIC(uint aux) => (aux >> 8) & 0x1u;
+        public static uint AUX_NAMECALL(uint aux) => (aux >> 9) & 0x1u;
+
         // Sealed feedback slot id sentinel, used by CALLFB
         public const uint FBSLOT_SEALED = 0xFFFFFFFF;
+
+        // Number of 32-bit words occupied by an instruction (including AUX), mirrors getOpLength in BytecodeUtils.h
+        public static int GetOpLength(LuauOpcode op)
+        {
+            switch (op)
+            {
+                case LuauOpcode.GETGLOBAL:
+                case LuauOpcode.SETGLOBAL:
+                case LuauOpcode.GETIMPORT:
+                case LuauOpcode.GETTABLEKS:
+                case LuauOpcode.SETTABLEKS:
+                case LuauOpcode.NAMECALL:
+                case LuauOpcode.JUMPIFEQ:
+                case LuauOpcode.JUMPIFLE:
+                case LuauOpcode.JUMPIFLT:
+                case LuauOpcode.JUMPIFNOTEQ:
+                case LuauOpcode.JUMPIFNOTLE:
+                case LuauOpcode.JUMPIFNOTLT:
+                case LuauOpcode.NEWTABLE:
+                case LuauOpcode.SETLIST:
+                case LuauOpcode.FORGLOOP:
+                case LuauOpcode.LOADKX:
+                case LuauOpcode.FASTCALL2:
+                case LuauOpcode.FASTCALL2K:
+                case LuauOpcode.FASTCALL3:
+                case LuauOpcode.JUMPXEQKNIL:
+                case LuauOpcode.JUMPXEQKB:
+                case LuauOpcode.JUMPXEQKN:
+                case LuauOpcode.JUMPXEQKS:
+                case LuauOpcode.GETUDATAKS:
+                case LuauOpcode.SETUDATAKS:
+                case LuauOpcode.NAMECALLUDATA:
+                case LuauOpcode.NEWCLASSMEMBER:
+                case LuauOpcode.CALLFB:
+                case LuauOpcode.CMPPROTO:
+                case LuauOpcode.NEWCLASS:
+                case LuauOpcode.CONSTRUCT:
+                case LuauOpcode.GETPRIVATEFIELD:
+                case LuauOpcode.SETPRIVATEFIELD:
+                    return 2;
+
+                default:
+                    return 1;
+            }
+        }
 
         // Alias helpers
         public delegate uint U32(uint insn);
@@ -523,8 +621,9 @@ namespace RobloxClientTracker.Luau
     {
         // Bytecode version; runtime supports [MIN, MAX], compiler emits TARGET by default but may emit a higher version when flags are enabled
         VERSION_MIN = 3,
-        VERSION_MAX = 11,
-        VERSION_TARGET = 6,
+        VERSION_MAX = 14,
+        VERSION_TARGET = 14,
+        VERSION_CLASSES = 100,
 
         // Type encoding version
         TYPE_VERSION_MIN = 1,
@@ -541,8 +640,9 @@ namespace RobloxClientTracker.Luau
         CONSTANT_CLOSURE,
         CONSTANT_VECTOR,
         CONSTANT_TABLE_WITH_CONSTANTS,
-        CONSTANT_INTEGER,
+        CONSTANT_INTEGER_DEPRECATED, // integers are no longer supported
         CONSTANT_CLASS_SHAPE,
+        CONSTANT_VECTORD,
     }
 
     // Constant Table Entries
@@ -557,8 +657,9 @@ namespace RobloxClientTracker.Luau
         CLOSURE,
         VECTOR,
         TABLE_WITH_CONSTANTS,
-        INTEGER,
+        INTEGER, // deprecated upstream, still parsed for legacy version 8 bytecode
         CLASS_SHAPE,
+        VECTORD,
     }
 
     // Type table tags
@@ -574,7 +675,9 @@ namespace RobloxClientTracker.Luau
         USERDATA,
         VECTOR,
         BUFFER,
-        INTEGER,
+        INTEGER_DEPRECATED, // integers are no longer supported
+        CLASS,
+        OBJECT,
 
         ANY = 15,
 
@@ -728,48 +831,18 @@ namespace RobloxClientTracker.Luau
         MATH_ISINF,
         MATH_ISFINITE,
 
-        // integer
-        INTEGER_CREATE,
-        INTEGER_TONUMBER,
-        INTEGER_NEG,
-        INTEGER_ADD,
-        INTEGER_SUB,
-        INTEGER_MUL,
-        INTEGER_DIV,
-        INTEGER_MIN,
-        INTEGER_MAX,
-        INTEGER_REM,
-        INTEGER_IDIV,
-        INTEGER_UDIV,
-        INTEGER_UREM,
-        INTEGER_MOD,
-        INTEGER_CLAMP,
-        INTEGER_BAND,
-        INTEGER_BOR,
-        INTEGER_BNOT,
-        INTEGER_BXOR,
-        INTEGER_LT,
-        INTEGER_LE,
-        INTEGER_ULT,
-        INTEGER_ULE,
-        INTEGER_GT,
-        INTEGER_GE,
-        INTEGER_UGT,
-        INTEGER_UGE,
-        INTEGER_LSHIFT,
-        INTEGER_RSHIFT,
-        INTEGER_ARSHIFT,
-        INTEGER_LROTATE,
-        INTEGER_RROTATE,
-        INTEGER_EXTRACT,
-        INTEGER_BTEST,
-        INTEGER_COUNTRZ,
-        INTEGER_COUNTLZ,
-        INTEGER_BSWAP,
+        // table.create / table.clear
+        // IDs 94..132 are reserved for removed integer fastcalls
+        TABLE_CREATE = 133,
+        TABLE_CLEAR,
 
-        // buffer.readinteger / buffer.writeinteger (int64_t)
-        BUFFER_READINTEGER,
-        BUFFER_WRITEINTEGER,
+        // buffer.readvectorf32x* / buffer.writevectorf32x* (N contiguous f32 components)
+        BUFFER_READVECTORF32X2,
+        BUFFER_READVECTORF32X3,
+        BUFFER_READVECTORF32X4,
+        BUFFER_WRITEVECTORF32X2,
+        BUFFER_WRITEVECTORF32X3,
+        BUFFER_WRITEVECTORF32X4,
     };
 
     public enum LuauCaptureType
@@ -777,6 +850,13 @@ namespace RobloxClientTracker.Luau
         VAL,
         REF,
         UPVAL,
+    }
+
+    // Class member visibility, used in NEWCLASSMEMBER
+    public enum LuauClassMemberVisibility
+    {
+        PUBLIC = 0,
+        PRIVATE = 1,
     }
 
     [Flags]
@@ -795,10 +875,16 @@ namespace RobloxClientTracker.Luau
 
         // function can be inlined
         INLINABLE = 1 << 3,
+
+        // top-level function uses export statements and returns the export table
+        USES_EXPORT = 1 << 4,
     }
 
     public enum LuauFeedbackType
     {
         CALLTARGET = 0,
+
+        // experimental bytecode versions only
+        CONSTRUCT = 1,
     }
 }

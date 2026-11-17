@@ -340,6 +340,7 @@ namespace RobloxClientTracker.Luau
                     case LuauOpcode.FASTCALL2:
                     case LuauOpcode.FASTCALL2K:
                     case LuauOpcode.FASTCALL3:
+                    case LuauOpcode.FASTPCALL:
                     {
                         suppressStatement = true;
                         consumesAux = op == LuauOpcode.FASTCALL2 || op == LuauOpcode.FASTCALL2K || op == LuauOpcode.FASTCALL3;
@@ -488,7 +489,7 @@ namespace RobloxClientTracker.Luau
                 }
                 if (opensBlock)
                     indentLevel++;
-                if (consumesAux)
+                if (consumesAux || LuauInsn.GetOpLength(op) > 1)
                     pc++;
             }
 

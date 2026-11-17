@@ -16,6 +16,12 @@ namespace RobloxClientTracker.Luau
     public class LuauClassShape
     {
         public int ClassName;
+        public int NumPrivateFields;
+        public int NumPrivateMethods;
+        public int NumProperties;
+        public int NumMethods;
+
+        // Only public members are named in the bytecode; private ones are addressed by offset.
         public int[] PropertyNames;
         public int[] MethodNames;
     }
@@ -72,11 +78,13 @@ namespace RobloxClientTracker.Luau
             };
 
             var version = reader.ReadByte();
+            const int versionMin = (int)LuauBytecodeTag.VERSION_MIN;
+            const int versionMax = (int)LuauBytecodeTag.VERSION_MAX;
 
             if (version == 0)
                 throw new Exception("Ill-formatted Luau.");
-            else if (version < 3 || version > 11)
-                throw new Exception($"Bytecode version mismatch (expected [3..11], got {version})");
+            else if ((version < versionMin || version > versionMax) && version != (int)LuauBytecodeTag.VERSION_CLASSES)
+                throw new Exception($"Bytecode version mismatch (expected [{versionMin}..{versionMax}], got {version})");
 
             var typesVersion = 0;
 
@@ -110,6 +118,13 @@ namespace RobloxClientTracker.Luau
 
             for (var i = 0; i < protoCount; i++)
             {
+                long protoSize = 0;
+
+                if (version >= 12)
+                    protoSize = readVarInt();
+
+                long protoStart = stream.Position;
+
                 var proto = new LuauProto();
                 proto.Parent = this;
                 proto.MaxStackSize = reader.ReadByte();
@@ -230,6 +245,20 @@ namespace RobloxClientTracker.Luau
 
                             break;
                         }
+                        case LuauConstType.VECTORD:
+                        {
+                            double x = reader.ReadDouble(),
+                                   y = reader.ReadDouble(),
+                                   z = reader.ReadDouble(),
+                                   w = reader.ReadDouble();
+
+                            if (w == 0d)
+                                constant.Value = new double[3] { x, y, z };
+                            else
+                                constant.Value = new double[4] { x, y, z, w };
+
+                            break;
+                        }
                         case LuauConstType.TABLE_WITH_CONSTANTS:
                         {
                             // Pairs of (key varint, value constant index as raw int32).
@@ -256,22 +285,27 @@ namespace RobloxClientTracker.Luau
                         }
                         case LuauConstType.CLASS_SHAPE:
                         {
-                            // className varint, propertyNames count varint, methodNames count varint, then names
                             int className = readVarInt();
-                            int propCount = readVarInt();
-                            int methodCount = readVarInt();
+                            int numPrivateFields = reader.ReadByte();
+                            int numPrivateMethods = reader.ReadByte();
+                            int numProperties = readVarInt();
+                            int numMethods = readVarInt();
 
-                            var props = new int[propCount];
-                            for (int k = 0; k < propCount; k++)
+                            var props = new int[Math.Max(0, numProperties - numPrivateFields)];
+                            for (int k = 0; k < props.Length; k++)
                                 props[k] = readVarInt();
 
-                            var methods = new int[methodCount];
-                            for (int k = 0; k < methodCount; k++)
+                            var methods = new int[Math.Max(0, numMethods - numPrivateMethods)];
+                            for (int k = 0; k < methods.Length; k++)
                                 methods[k] = readVarInt();
 
                             constant.Value = new LuauClassShape
                             {
                                 ClassName = className,
+                                NumPrivateFields = numPrivateFields,
+                                NumPrivateMethods = numPrivateMethods,
+                                NumProperties = numProperties,
+                                NumMethods = numMethods,
                                 PropertyNames = props,
                                 MethodNames = methods,
                             };
@@ -362,16 +396,25 @@ namespace RobloxClientTracker.Luau
                     }
                 }
 
-                // Feedback slots (LuauEmitCallFeedback, bytecode version >= 11)
+                // Feedback slots (bytecode version >= 11)
                 if (version >= 11)
                 {
                     int fbCount = readVarInt();
 
                     for (int j = 0; j < fbCount; j++)
                     {
-                        reader.ReadByte(); // LuauFeedbackType (currently only CALLTARGET = 0)
-                        readVarInt();      // pc of the feedback instruction
+                        reader.ReadByte(); // LuauFeedbackType
+                        readVarInt();      // CALLTARGET: pc of the feedback instruction, CONSTRUCT: shape constant
                     }
+                }
+
+                if (version >= 12)
+                {
+                    if ((proto.Flags & LuauProtoFlags.INLINABLE) != 0)
+                        proto.Cost = readVarInt64();
+
+                    // Skip any trailing proto data that this reader doesn't understand yet.
+                    stream.Position = protoStart + protoSize;
                 }
 
                 Protos[i] = proto;

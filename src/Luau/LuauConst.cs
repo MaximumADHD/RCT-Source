@@ -126,11 +126,12 @@ namespace RobloxClientTracker.Luau
                     break;
                 }
                 case LuauConstType.VECTOR:
+                case LuauConstType.VECTORD:
                 {
                     if (Value is Array array)
                     {
-                        float[] vec = array
-                            .Cast<float>()
+                        var vec = array
+                            .Cast<object>()
                             .ToArray();
 
                         result += $"{{{string.Join(", ", vec)}}}";
@@ -148,7 +149,7 @@ namespace RobloxClientTracker.Luau
                     if (Value is LuauClassShape cs)
                     {
                         string name = Proto.Consts[cs.ClassName].Value?.ToString() ?? "?";
-                        result += $"class {name} (props: {cs.PropertyNames.Length}, methods: {cs.MethodNames.Length})";
+                        result += $"class {name} (props: {cs.NumProperties}, methods: {cs.NumMethods}, private fields: {cs.NumPrivateFields}, private methods: {cs.NumPrivateMethods})";
                     }
 
                     break;
