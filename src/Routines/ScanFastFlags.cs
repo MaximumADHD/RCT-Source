@@ -40,9 +40,17 @@ namespace RobloxClientTracker
                 print("Scanning C++ flags...");
                 cppFlags = StudioFFlagDumper.DumpCppFlags(studioPath);
                 
-                if (cppFlags.Count == 0 || cppFlags.Any(flag => flag.StartsWith("ERROR") || flag.StartsWith("DERROR")))
+                if (cppFlags.Any(flag => flag.StartsWith("ERROR") || flag.StartsWith("DERROR")))
                 {
                     throw new InvalidDataException("Static C++ FastVariable extraction failed.");
+                }
+
+                if (cppFlags.Count == 0)
+                {
+                    if (luaFlags.Count == 0)
+                        throw new InvalidDataException("No C++ or Lua FastVariables were found.");
+
+                    print("Static C++ FastVariable extraction returned no flags; continuing with Lua flags.");
                 }
             }
             
